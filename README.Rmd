@@ -1,0 +1,8 @@
+---
+title: "ReadMe"
+author: "Julian Hatwell"
+date: "17 January 2016"
+output: html_document
+---
+
+# Here is some utility code for statistical learning, especially using caret
