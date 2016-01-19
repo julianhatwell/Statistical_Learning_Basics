@@ -5,6 +5,7 @@ library(ggplot2)
 library(parallel)
 library(doParallel)
 
+source("https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R")
 source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/myFirstTheme.R")
 
 # default data pack
@@ -102,6 +103,15 @@ layoutPlots_4 <- function(vars, plotFunc, df) {
   print(plotFunc(vars[4], df), pos = c(0.5, 0, 1, 0.5))
 }
 
+# the following code takes a data frame 
+# i.e. training, validation or test sets, not my dt class
+# NB this is not working as expected
+createDummies <- function(df, resp) {
+  fmla <- as.formula(paste0(resp, "~."))
+  dummify <- dummyVars(fmla,data = df)
+  return(as.data.frame(predict(dummify, df)))
+}
+
 # look for NAs
 na.vals.check <- function(dt) {
   return(apply(dt$dt.frm, 2, function(j) {
@@ -116,6 +126,18 @@ nzv.check <- function(dt) {
   return(nearZeroVar(dt$dt.frm, saveMetrics = TRUE))
 }
 
+# look for highly correlated vars
+cor.vars.check <- function(dt, ctff = 0.75) {
+  cor.dt <- cor(dt$dt.frm[,dt$vars[!dt$vars_fac]])
+  summary(cor.dt[upper.tri(cor.dt)])
+  return(findCorrelation(cor.dt, cutoff = ctff))
+}
+
+# look for linear dependencies
+lin.comb.check <- function(dt) {
+  findLinearCombos(dt$dt.frm[,dt$vars[!dt$vars_fac]])
+}
+
 myStandardPartitioning <- function(dt, seed = 23) {
   set.seed(seed)
   # partitioning the data
@@ -128,30 +150,12 @@ myStandardPartitioning <- function(dt, seed = 23) {
   validation_set <- holdout_set[validation_ids, ]
   test_set <- holdout_set[-validation_ids, ]
   
-  return(list(training_set, validation_set, test_set, training_ids, validation_ids))
+  return(list(training_set = training_set
+              , validation_set = validation_set
+              , test_set = test_set
+              , training_ids = training_ids
+              , validation_ids = validation_ids))
 }
-
-# the following code takes a data frame 
-# i.e. training, validation or test sets, not my dt class
-createDummies <- function(df, resp) {
-  return(dummyVars(resp~.,data = df))
-}
-
-
-# still TO DO
-# look for highly correlated vars
-cor.vars.check <- cor(df[,vars[!vars_fac]])
-summary(cor.vars.check[upper.tri(cor.vars.check)])
-cor.vars <- findCorrelation(cor.vars.check, cutoff = .75)
-# removing them all us too crude at the moment
-
-# look for linear depends
-findLinearCombos(df[,vars[!vars_fac]])
-
-# create dummy vars from factors
-training_facsAsDummies <- dummyVars(resp~.,data = df)
-head(predict(training_facsAsDummies, newdata = df))
-
 
 
 # beautiful boiler plate for creating the models
