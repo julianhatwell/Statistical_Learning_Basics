@@ -16,34 +16,83 @@ getRespCol <- function(df, y) {
   return(which(names(df) == y))
 }
 
-# various loopable plots for examining vars
-myScatterPlot <- function(j, df) {
-  xyplot(df[[j]]~I(1:nrow(df))
-         , groups = y_fac 
-         , col = myPal.range(num_classes)
-         , alpha = 1/(length(training_ids)/2000)
-         , ylab = j
-         , xlab = "index"
+createModelMatrix <- function(algorithms, transforms) {
+  models <- cbind(algo = rep(algorithms, each = 2),trans = transforms)
+  models <- cbind(models
+                  , model = paste(models[,1]
+                                  , models[,2]
+                                  ,"model", sep = "_")
+  )
+  models <- cbind(models
+                  , result = gsub("model", "cm", models[,3])
+                  , pred = gsub("model", "pred", models[,3])
+                  , mark = gsub("model", "mark", models[,3])
+  )
+  return(models)
+}
+
+# to be generic - set the data set names here
+setData <- function(df, resp, makeFactorResp = FALSE) {
+  if (makeFactorResp) { # if resp should be a factor but is not one
+    df[[resp]] <- factor(df[[resp]])
+    isFactorResp <- TRUE
+  }
+  num_classes <- NA
+  if (any(class(df[[resp]]) == "factor")) {
+    num_classes <- length(levels(factor(df[[resp]])))
+  }
+  respCol = getRespCol(df, resp)
+  return(list(dt.frm = df
+              , resp = resp
+              , num_classes = num_classes
+              , vars = names(df)[-respCol]
+              , vars_fac = sapply(df[-respCol], function(j) { any(class(j) == "factor") } )
+              , respCol = respCol
+  )
   )
 }
 
-myViolinPlot <- function(j, df, resp) {
-  bwplot(df[[j]]~df[[resp]]
-         , groups = df[[resp]]
-         , col = myPal.rangeContrasts(num_classes)
+# various loopable plots for examining vars
+myScatterPlot <- function(j, dt) {
+  xyplot(dt$dt.frm[[j]]~I(1:nrow(dt$dt.frm)) | dt$dt.frm[[dt$resp]]
+         , groups = dt$dt.frm[[dt$resp]] 
+         , col = myPal.rangeContrasts(
+            (dt$num_classes + 1)* 10)[seq(10, dt$num_classes*10, 10)]
+         , alpha = 1/((nrow(dt$dt.frm))/2000)
+         , ylab = j
+         , xlab = "index"
+         , par.settings = MyLatticeTheme
+         , strip = MyLatticeStrip
+  )
+}
+
+myViolinPlot <- function(j, dt) {
+  bwplot(dt$dt.frm[[j]]~dt$dt.frm[[dt$resp]]
+         , groups = dt$dt.frm[[dt$resp]]
+         , col = myPal.rangeContrasts(
+            (dt$num_classes + 1)* 10)[seq(10, dt$num_classes*10, 10)]
          , scales = list(y = list(tck = c(1, 0)))
          , panel = panel.superpose
          , panel.groups = panel.violin
-         , xlab = resp
-         , ylab = j)
+         , xlab = dt$resp
+         , ylab = j
+         , par.settings = MyLatticeTheme
+         , strip = MyLatticeStrip
+  )
 }
 
-myDensityPlot <- function(j, df, resp) {
-  densityplot(~df[[j]] | df[[resp]]
-              , groups = df[[resp]]
-              , col = myPal.rangeContrasts((num_classes + 1)* 10)[seq(10, num_classes*10, 10)]
+myDensityPlot <- function(j, dt, pnts) {
+  densityplot(~dt$dt.frm[[j]] | dt$dt.frm[[dt$resp]]
+              , groups = dt$dt.frm[[dt$resp]]
+              , plot.points = pnts
+              , lwd = 1.25
+              , col = myPal.rangeContrasts(
+                (dt$num_classes + 1)* 10)[seq(10, dt$num_classes*10, 10)]
               , scales = list(y = list(tck = c(1, 0)))
-              , xlab = j)
+              , xlab = j
+              , par.settings = MyLatticeTheme
+              , strip = MyLatticeStrip
+  )
 }
 
 layoutPlots_4 <- function(vars, plotFunc, df) {
@@ -53,63 +102,43 @@ layoutPlots_4 <- function(vars, plotFunc, df) {
   print(plotFunc(vars[4], df), pos = c(0.5, 0, 1, 0.5))
 }
 
-# to be generic - set the data set names here
-setData <- function(df, resp, makeFactorResp = FALSE) {
-  if (makeFactorResp) { # if resp should be a factor but is not one
-    df[[resp]] <- factor(df[[resp]]) 
-    num_classes <<- length(levels(factor(df[[resp]])))
-  }
-  # write upstairs
-  df <<- df
-  resp <<- resp
-  respCol <<- getRespCol(df, resp)
-  vars <<- names(df)[-respCol]
-  vars_fac <<- sapply(df[-respCol], function(j) { any(class(j) == "factor") } )
-}
-
-par(ask = TRUE)
-for (var in vars[!vars_fac]) {
-  v <- myViolinPlot(var, df, resp)
-  print(v)
-}
-
-par(ask = TRUE)
-for (var in vars[!vars_fac]) {
-  v <- myDensityPlot(var, df, resp)
-  print(v)
-}
-par(ask = FALSE)
-
 # look for NAs
-na.vals.check <- function (df) {
-  return(apply(df, 2, function(j) { sum(is.na(j))/length(j)} ))
+na.vals.check <- function(dt) {
+  return(apply(dt$dt.frm, 2, function(j) {
+                  sum(is.na(j))/length(j)
+                }
+               )
+         )
 }
 
 # look for near zero variance variables
-near.zero.vars.check <- function(df) {
-  return(nearZeroVar(df, saveMetrics = TRUE))
+nzv.check <- function(dt) {
+  return(nearZeroVar(dt$dt.frm, saveMetrics = TRUE))
 }
 
-myStandardPartitioning <- function(df, seed = 23) {
+myStandardPartitioning <- function(dt, seed = 23) {
   set.seed(seed)
   # partitioning the data
-  training_ids <- createDataPartition(df[[resp]], p = 0.6, list = FALSE)
-  training_set <- df[training_ids,]
+  training_ids <- createDataPartition(dt$dt.frm[[dt$resp]], p = 0.6, list = FALSE)
+  training_set <- dt$dt.frm[training_ids,]
   
-  holdout_set <- df[-training_ids,]
+  holdout_set <- dt$dt.frm[-training_ids,]
   
-  validation_ids <- createDataPartition(holdout_set[[resp]], p = 0.5, list = FALSE)
+  validation_ids <- createDataPartition(holdout_set[[dt$resp]], p = 0.5, list = FALSE)
   validation_set <- holdout_set[validation_ids, ]
   test_set <- holdout_set[-validation_ids, ]
   
   return(list(training_set, validation_set, test_set, training_ids, validation_ids))
 }
 
+# the following code takes a data frame 
+# i.e. training, validation or test sets, not my dt class
 createDummies <- function(df, resp) {
   return(dummyVars(resp~.,data = df))
 }
 
 
+# still TO DO
 # look for highly correlated vars
 cor.vars.check <- cor(df[,vars[!vars_fac]])
 summary(cor.vars.check[upper.tri(cor.vars.check)])
@@ -123,9 +152,10 @@ findLinearCombos(df[,vars[!vars_fac]])
 training_facsAsDummies <- dummyVars(resp~.,data = df)
 head(predict(training_facsAsDummies, newdata = df))
 
-tc <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
 
-get_or_train <- function(algo, trans) {
+
+# beautiful boiler plate for creating the models
+get_or_train <- function(algo, trans, tc) {
   
   modelName <- paste(algo, trans, sep = "_")
   modelFileName <- paste0("model_", modelName, ".RData")
@@ -153,17 +183,3 @@ get_or_train <- function(algo, trans) {
   return(model)
 }
 
-
-algorithms <- c("gbm", "qda", "rf")
-transforms <- c("pca", "set")
-models <- cbind(algo = rep(algorithms, each = 2),trans = transforms)
-models <- cbind(models
-                , model = paste(models[,1]
-                                , models[,2]
-                                ,"model", sep = "_")
-)
-models <- cbind(models
-                , result = gsub("model", "cm", models[,3])
-                , pred = gsub("model", "pred", models[,3])
-                , mark = gsub("model", "mark", models[,3])
-)
