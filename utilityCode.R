@@ -43,15 +43,15 @@ setData <- function(df, resp, makeFactorResp = FALSE) {
     num_classes <- length(levels(factor(df[[resp]])))
   }
   respCol = getRespCol(df, resp)
-  dt <- list(dt.frm = df
+  df.e <- list(dt.frm = df
               , resp = resp
               , num_classes = num_classes
               , vars = names(df)[-respCol]
               , vars_fac = sapply(df[-respCol], function(j) { any(class(j) == "factor") } )
               , respCol = respCol
              )
-  class(dt) <- "dt_collection"
-  return(dt)
+  class(df.e) <- "df.enum"
+  return(df.e)
 
 }
 
@@ -152,11 +152,13 @@ myStandardPartitioning <- function(dt, seed = 23) {
   validation_set <- holdout_set[validation_ids, ]
   test_set <- holdout_set[-validation_ids, ]
   
-  return(list(trn = training_set
+  df.c <- list(trn = training_set
               , val = validation_set
               , tst = test_set
               , training_ids = training_ids
-              , validation_ids = validation_ids))
+              , validation_ids = validation_ids)
+  class(df.c) <- "df.collection"
+  return(df.c)
 }
 
 
@@ -205,5 +207,17 @@ createModels <- function(df, resp, models, tCtrls) {
              , envir = .GlobalEnv
       )
     }
-  }
+  return()}
+  if (any(class(df) == "df.collection")) {
+    for (m in 1:n) {
+      assign(models[m,"model"]
+             , get_or_train(df[[models[m, "set"]]], resp
+                            , algo = models[m,"algo"]
+                            , set = models[m, "set"]
+                            , tc = tCtrls[[algo]])
+             , envir = .GlobalEnv
+      )
+    }
+    print("in df.col")
+  return()}
 }
