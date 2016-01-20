@@ -2,12 +2,19 @@
 source("utilityCode.R")
 
 # choose your statistical learning method
-algorithms <- c("gbm", "qda", "rf")
+algorithms <- c("lda", "qda")
 # list your transforms or just set for full set.
-transforms <- c("pca", "set")
+sets <- c("trn", "pca")
 
 # set up the models matrix
-models <- createModelMatrix(algorithms, transforms)
+models <- createModelMatrix(algorithms, sets)
+
+# set up the train controls for each model
+# to customise for any model, over-write the default
+tCtrls <- list()
+for (algo in algorithms) {
+  tCtrls[[algo]] <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+}
 
 # configure the data frame here
 # refer out to any custom code, to do the basics
@@ -33,7 +40,8 @@ par(ask = FALSE)
 
 # create dummy variables out of factors if required
 # NB this is not currently working as expected
-trn.val.tst$training_set <- createDummies(trn.val.tst$training_set, dt$resp)
+# commented out for now
+# dt$dt.frm <- createDummies(dt$dt.frm, dt$resp)
 
 # check for NA vals
 na.vals.check(dt)
@@ -52,18 +60,10 @@ lin.comb.check(dt)
 trn.val.tst <- myStandardPartitioning(dt)
 
 # all pre-processing here. use the boiler plate funcs and add any custom code here
+# add further data sets to the trn.val.tst object
 
 
-
-# choose some training control parameters for each model
-# to DO - vectorise
-tc <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
-
-# loop over models and tc objects! TO DO.
-n <- nrow(models)
-for (m in 1:n) {
-  assign(models[m,"model"]
-         , get_or_train(algo = models[m,"algo"]
-                        , trans = models[m, "trans"])
-  )
-}
+# create the models
+# df version
+createModels(trn.val.tst$training_set, dt$resp, models, tCtrls)
+# dt version

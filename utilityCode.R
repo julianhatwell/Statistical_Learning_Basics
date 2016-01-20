@@ -17,8 +17,8 @@ getRespCol <- function(df, y) {
   return(which(names(df) == y))
 }
 
-createModelMatrix <- function(algorithms, transforms) {
-  models <- cbind(algo = rep(algorithms, each = 2),trans = transforms)
+createModelMatrix <- function(algorithms, sets) {
+  models <- cbind(algo = rep(algorithms, each = length(sets)), set = sets)
   models <- cbind(models
                   , model = paste(models[,1]
                                   , models[,2]
@@ -43,14 +43,16 @@ setData <- function(df, resp, makeFactorResp = FALSE) {
     num_classes <- length(levels(factor(df[[resp]])))
   }
   respCol = getRespCol(df, resp)
-  return(list(dt.frm = df
+  dt <- list(dt.frm = df
               , resp = resp
               , num_classes = num_classes
               , vars = names(df)[-respCol]
               , vars_fac = sapply(df[-respCol], function(j) { any(class(j) == "factor") } )
               , respCol = respCol
-  )
-  )
+             )
+  class(dt) <- "dt_collection"
+  return(dt)
+
 }
 
 # various loopable plots for examining vars
@@ -159,22 +161,24 @@ myStandardPartitioning <- function(dt, seed = 23) {
 
 
 # beautiful boiler plate for creating the models
-get_or_train <- function(algo, trans, tc) {
+get_or_train <- function(df, resp, algo, set = "trn"
+                         , tc = trainControl(method = "cv"
+                                            , number = 5
+                                            , allowParallel = TRUE)) {
   
-  modelName <- paste(algo, trans, sep = "_")
-  modelFileName <- paste0("model_", modelName, ".RData")
+  modelName <- paste(algo, set, sep = "_")
+  modelFileName <- paste0(modelName, ".RData")
   
   if (file.exists(modelFileName)) {
     attach(modelFileName, warn.conflicts = FALSE)
   } else {
-    dsName <- paste0("training_", trans)
-    
     # set up parallel processing
     p_clus <- makeCluster(detectCores())
     registerDoParallel(p_clus)
     
     # build the model
-    assign(modelName, train(classe~., data = get(dsName),  trControl = tc, method = algo))
+    fmla <- as.formula(paste0(resp, "~."))
+    assign(modelName, train(fmla, data = df,  trControl = tc, method = algo))
     
     # close parallel processing
     stopCluster(p_clus)
@@ -187,3 +191,18 @@ get_or_train <- function(algo, trans, tc) {
   return(model)
 }
 
+createModels <- function(df, resp, models, tCtrls) {
+  # still need to do a vesrion that works on the dt_collection class
+  # and uses the right data set from within the class.
+  n <- nrow(models)
+  if (class(df) == "data.frame") {
+    for (m in 1:n) {
+      assign(models[m,"model"]
+             , get_or_train(df, resp
+                            , algo = models[m,"algo"]
+                            , set = models[m, "set"]
+                            , tc = tCtrls[[algo]])
+      )
+    }
+  }
+}
