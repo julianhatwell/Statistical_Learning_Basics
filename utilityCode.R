@@ -152,9 +152,9 @@ myStandardPartitioning <- function(dt, seed = 23) {
   validation_set <- holdout_set[validation_ids, ]
   test_set <- holdout_set[-validation_ids, ]
   
-  return(list(training_set = training_set
-              , validation_set = validation_set
-              , test_set = test_set
+  return(list(trn = training_set
+              , val = validation_set
+              , tst = test_set
               , training_ids = training_ids
               , validation_ids = validation_ids))
 }
@@ -195,13 +195,14 @@ createModels <- function(df, resp, models, tCtrls) {
   # still need to do a vesrion that works on the dt_collection class
   # and uses the right data set from within the class.
   n <- nrow(models)
-  if (class(df) == "data.frame") {
+  if (any(class(df) == "data.frame")) {
     for (m in 1:n) {
       assign(models[m,"model"]
              , get_or_train(df, resp
                             , algo = models[m,"algo"]
                             , set = models[m, "set"]
                             , tc = tCtrls[[algo]])
+             , envir = .GlobalEnv
       )
     }
   }

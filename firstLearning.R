@@ -1,42 +1,13 @@
 # stat learning project set up
 source("utilityCode.R")
 
-# choose your statistical learning method
-algorithms <- c("lda", "qda")
-# list your transforms or just set for full set.
-sets <- c("trn", "pca")
-
-# set up the models matrix
-models <- createModelMatrix(algorithms, sets)
-
-# set up the train controls for each model
-# to customise for any model, over-write the default
-tCtrls <- list()
-for (algo in algorithms) {
-  tCtrls[[algo]] <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
-}
-
 # configure the data frame here
 # refer out to any custom code, to do the basics
 # such as making appropriate factors, ditching obviously useless columns
 data("diamonds")
 dt <- setData(diamonds, "cut")
 
-# use this to do EDA, as well as the marvelous EDA report
-par(ask = TRUE)
-for (var in dt$vars[!dt$vars_fac]) {
-    v <- myViolinPlot(var, dt)
-    print(v)
-  }
-for (var in dt$vars[!dt$vars_fac]) {
-  v <- myScatterPlot(var, dt)
-  print(v)
-}
-for (var in dt$vars[!dt$vars_fac]) {
-  v <- myDensityPlot(var, dt, pnts = FALSE)
-  print(v)
-}
-par(ask = FALSE)
+# use the EDA file to explore the data
 
 # create dummy variables out of factors if required
 # NB this is not currently working as expected
@@ -67,3 +38,4 @@ trn.val.tst <- myStandardPartitioning(dt)
 # df version
 createModels(trn.val.tst$training_set, dt$resp, models, tCtrls)
 # dt version
+
