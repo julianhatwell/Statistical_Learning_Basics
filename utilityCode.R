@@ -183,7 +183,7 @@ get_or_train <- function(df, resp, algo
     attach(modelFileName, warn.conflicts = FALSE)
   } else {
     # set up parallel processing
-    p_clus <- makeCluster(detectCores())
+    p_clus <- makeCluster(detectCores() - 1)
     registerDoParallel(p_clus)
     
     # build the model

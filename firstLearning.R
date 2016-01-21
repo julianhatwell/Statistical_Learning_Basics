@@ -25,12 +25,12 @@ dt <- setData(diamonds, "price")
 trn.val.tst <- myStandardPartitioning(dt)
 
 # choose your statistical learning method
-algorithms <- c("foba")
+algorithms <- c("lm", "foba", "lasso")
 # set up the train controls for each model
 # to customise for any model, over-write the default
 tCtrls <- list()
 for (algo in algorithms) {
-  tCtrls[[algo]] <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+  tCtrls[[algo]] <- trainControl(method = "cv", number = 4, allowParallel = TRUE)
 }
 
 # TO DO - implement tune grids
