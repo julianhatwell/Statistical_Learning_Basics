@@ -21,7 +21,8 @@ createModelMatrix <- function(algorithms, sets) {
   models <- cbind(algo = rep(algorithms, each = length(sets))
                   , sets = sets
                   , trn.set = paste0("trn.",sets)
-                  , val.set = paste0("val.",sets))
+                  , val.set = paste0("val.",sets)
+                  , tst.set = paste0("tst.",sets))
   models <- cbind(models
                   , model = paste(models[,1]
                                   , models[,2]
@@ -29,9 +30,9 @@ createModelMatrix <- function(algorithms, sets) {
                                   , sep = ".")
   )
   models <- cbind(models
-                  , cmat = gsub("model", "cmat", models[,5])
-                  , pred = gsub("model", "pred", models[,5])
-                  , mark = gsub("model", "mark", models[,5])
+                  , cmat = gsub("model", "cmat", models[,"model"])
+                  , pred = gsub("model", "pred", models[,"model"])
+                  , mark = gsub("model", "mark", models[,"model"])
   )
   return(models)
 }
@@ -222,21 +223,38 @@ createModels <- function(df, resp, models, tCtrls) {
     }
 }
 
-createConfMats <- function(dt, resp, models) {
+generatePredictions <- function(dt, models, type = "val.set") {
+  n <- nrow(models)
+  predictions <- data.frame()
+  
+  for (m in 1:n) {
+    assign(models[m,"pred"], predict(get(models[m,"model"])
+                                     , dt[[models[m, type]]])
+           , envir = .GlobalEnv
+    )
+    predictions <- rbind(predictions
+                         , data.frame(model = models[m,"model"]
+                                      , prediction = get(models[m, "pred"])
+                         )
+    )
+    
+  }
+  return(predictions)
+}
+
+createConfMats <- function(preds, type = "val.set", dt, resp, models) {
   n <- nrow(models)
   confmats <- data.frame()
   for (m in 1:n) {
     assign(models[m,"cmat"]
-           , confusionMatrix(predict(get(models[m, "model"])
-                                     , dt[[models[m,"val.set"]]])
-                             , dt[[models[m,"val.set"]]][, resp]
-           )
-    , envir = .GlobalEnv
+           , confusionMatrix(preds[preds$model == models[m, "model"], "prediction"]
+                             , dt[[models[m, type]]][[resp]])
+           , envir = .GlobalEnv
     )
     confmats <- rbind(confmats
                       , cbind.data.frame(model =  models[m, "model"]
                                          ,  get(models[m, "cmat"])$table)
-                      )
+    )
   }
   return(confmats)
 }
@@ -260,4 +278,70 @@ myConfMatsPlot <- function(cf) {
                          , cex = 0.75)
   )
 }
+
+compareModelStats <- function(models, ptype) {
+  n <- nrow(models)
   
+  buildTimes <- numeric(n)
+  for (m in 1:n) {
+    buildTimes[m] <- get(models[m, "model"])$times$everything[3]
+    
+  }
+  modelStats <- data.frame(model = models[, "model"]
+                           , buildTimes = buildTimes)
+  
+  if (ptype == "regression") {
+    RMSE <- numeric(n)
+      for (m in 1:n) {
+        RMSE[m] <- round(min(get(models[m, "model"])$results$RMSE), 4)
+      }
+    modelStats <- cbind(modelStats, RMSE)
+  }
+  
+  if (ptype == "classification") {
+    cvAccuracy <- numeric(n)
+    accuracy <- matrix(0, n, 3
+                       , dimnames = list(NULL # name the rows later
+                                         , c("Accuracy"
+                                             , "Accuracy_Lower"
+                                             , "Accuracy_Upper")))
+    for (m in 1:n) {
+      cvAccuracy[m] <- round(max(get(models[m, "model"])$results$cvAccuracy),4)
+      accuracy[m,] <- round(get(models[m, "cmat"])$overall[c(1, 3:4)], 4)
+    }
+    modelStats <- cbind(modelStats
+                          , cvAccuracy = cvAccuracy
+                          , OOS_Err_cv = 1 - cvAccuracy
+                          , accuracy)
+  }
+  return(modelStats)
+}
+
+compareModelStatsPlot <- function(ms, ptype) {
+  if (ptype == "regression") {
+    fmla <- as.formula("RMSE ~ buildTimes")
+  }
+  if (ptype == "classification") {
+    fmla <- as.formula("cvAccuracy~buildTimes")
+  }
+  xyplot(fmla, data = ms
+         , prepanel = function(x, y, type, ...) {
+             prepanel.default.xyplot(c(min(x) - 0.1, max(x) + 0.1)
+                                     , c(min(y) - 0.01, max(y) + 0.01)
+                                     , type, ...)
+         }
+         , panel = function(x,y) {
+             panel.xyplot(x, y
+                          , pch = 19
+                          , col = myPal[5]
+                          , alpha = 1)
+             panel.text(x, y, pos = 1
+                        , modelStats$model)
+         }
+         , scales = list(tck = 1:0)
+         , main = "Model Performance and Training Times"
+         , xlab = "Training Time (seconds)"
+         , ylab = "Out of sample accuracy estimate"
+         , par.settings = MyLatticeTheme
+         )
+}
