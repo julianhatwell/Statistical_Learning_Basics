@@ -1,6 +1,9 @@
 # stat learning project set up
 source("utilityCode.R")
 
+# give this run a unique name
+thisRun <- "uniqueName"
+
 # configure the data frame here
 # refer out to any custom code, to do the basics
 # such as making appropriate factors, ditching obviously useless columns
@@ -28,8 +31,14 @@ trn.val.tst <- myStandardPartitioning(dt)
 # add further data sets to the trn.val.tst object
 
 # for example
-trn.val.tst$pca <- trn.val.tst$trn[,1:4] # imagine that's been PCA trans'd
-names(trn.val.tst$pca) <- paste0(names(trn.val.tst$pca),".pca")
+myPreProc <- preProcess(trn.val.tst$trn[-dt$respCol]
+                        , method = "pca"
+                        , thresh = 0.8)
+
+trn.val.tst$pca <- predict(myPreProc, trn.val.tst$trn)
+# The number of predictor dimensions has been reduced to:                      
+dim(trn.val.tst$pca)[2] -1
+
 # create the models
 # df version
 createModels(trn.val.tst, dt$resp, models, tCtrls)

@@ -56,9 +56,9 @@ setData <- function(df, resp, makeFactorResp = FALSE) {
 }
 
 # various loopable plots for examining vars
-myScatterPlot <- function(j, dt) {
-  xyplot(dt$dt.frm[[j]]~I(1:nrow(dt$dt.frm)) | dt$dt.frm[[dt$resp]]
-         , groups = dt$dt.frm[[dt$resp]] 
+myScatterPlot <- function(j, df, resp) {
+  xyplot(df[[j]]~I(1:nrow(df)) | df[[resp]]
+         , groups = df[[resp]] 
          , col = myPal.rangeContrasts(
             (dt$num_classes + 1)* 10)[seq(10, dt$num_classes*10, 10)]
          , alpha = 1/((nrow(dt$dt.frm))/2000)
@@ -69,9 +69,9 @@ myScatterPlot <- function(j, dt) {
   )
 }
 
-myViolinPlot <- function(j, dt) {
-  bwplot(dt$dt.frm[[j]]~dt$dt.frm[[dt$resp]]
-         , groups = dt$dt.frm[[dt$resp]]
+myViolinPlot <- function(j, df, resp) {
+  bwplot(df[[j]]~df[[resp]]
+         , groups = df[[resp]]
          , col = myPal.rangeContrasts(
             (dt$num_classes + 1)* 10)[seq(10, dt$num_classes*10, 10)]
          , scales = list(y = list(tck = c(1, 0)))
@@ -84,9 +84,9 @@ myViolinPlot <- function(j, dt) {
   )
 }
 
-myDensityPlot <- function(j, dt, pnts) {
-  densityplot(~dt$dt.frm[[j]] | dt$dt.frm[[dt$resp]]
-              , groups = dt$dt.frm[[dt$resp]]
+myDensityPlot <- function(j, df, resp, pnts = TRUE) {
+  densityplot(~df[[j]] | df[[resp]]
+              , groups = df[[resp]]
               , plot.points = pnts
               , lwd = 1.25
               , col = myPal.rangeContrasts(
@@ -98,7 +98,7 @@ myDensityPlot <- function(j, dt, pnts) {
   )
 }
 
-layoutPlots_4 <- function(vars, plotFunc, df) {
+#layoutPlots_4 <- function(vars, plotFunc, df) {
   print(plotFunc(vars[1], df), pos = c(0,0.5, 0.5, 1), more = TRUE)
   print(plotFunc(vars[2], df), pos = c(0.5, 0.5, 1, 1), more = TRUE)
   print(plotFunc(vars[3], df), pos = c(0, 0, 0.5, 0.5), more = TRUE)
