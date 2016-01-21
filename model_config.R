@@ -3,10 +3,10 @@
 # choose your statistical learning method
 algorithms <- c("lda", "qda")
 
-# list your transforms or just "trn" for the as is training set
+# list your transforms or just "asis" for the as is training set
 # and remember to build any transformed sets with custom code
 # to avoid building unecesary duplicates
-sets <- c("trn", "pca")
+sets <- c("asis", "pca")
 
 # set up the models matrix
 models <- createModelMatrix(algorithms, sets)

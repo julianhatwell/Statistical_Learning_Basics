@@ -31,18 +31,21 @@ trn.val.tst <- myStandardPartitioning(dt)
 # add further data sets to the trn.val.tst object
 
 # for example
-myPreProc <- preProcess(trn.val.tst$trn[-dt$respCol]
+myPreProc <- preProcess(trn.val.tst$trn.asis[-dt$respCol]
                         , method = "pca"
                         , thresh = 0.9)
 
 # the new data frame must be named as a set in the model config
-trn.val.tst$pca <- predict(myPreProc, trn.val.tst$trn)
+trn.val.tst$trn.pca <- predict(myPreProc, trn.val.tst$trn.asis)
+trn.val.tst$val.pca <- predict(myPreProc, trn.val.tst$val.asis)
 # The number of predictor dimensions has been reduced to:                      
-dim(trn.val.tst$pca)[2] -1
+dim(trn.val.tst$trn.pca)[2] -1
 
 # create the models
 # df version
 createModels(trn.val.tst, dt$resp, models, tCtrls)
 # dt version - will try to match model config with dt_collection members by set name
 
-
+# for classification problems, build a confusion matrix index from the built models
+confmats <- createConfMats(trn.val.tst, dt$resp, models)
+myConfMatsPlot(confmats)

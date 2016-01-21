@@ -18,16 +18,20 @@ getRespCol <- function(df, y) {
 }
 
 createModelMatrix <- function(algorithms, sets) {
-  models <- cbind(algo = rep(algorithms, each = length(sets)), set = sets)
+  models <- cbind(algo = rep(algorithms, each = length(sets))
+                  , sets = sets
+                  , trn.set = paste0("trn.",sets)
+                  , val.set = paste0("val.",sets))
   models <- cbind(models
                   , model = paste(models[,1]
                                   , models[,2]
-                                  ,"model", sep = "_")
+                                  , "model"
+                                  , sep = ".")
   )
   models <- cbind(models
-                  , result = gsub("model", "cm", models[,3])
-                  , pred = gsub("model", "pred", models[,3])
-                  , mark = gsub("model", "mark", models[,3])
+                  , cmat = gsub("model", "cmat", models[,5])
+                  , pred = gsub("model", "pred", models[,5])
+                  , mark = gsub("model", "mark", models[,5])
   )
   return(models)
 }
@@ -143,32 +147,35 @@ lin.comb.check <- function(dt) {
 myStandardPartitioning <- function(dt, seed = 23) {
   set.seed(seed)
   # partitioning the data
-  training_ids <- createDataPartition(dt$dt.frm[[dt$resp]], p = 0.6, list = FALSE)
-  training_set <- dt$dt.frm[training_ids,]
+  trn.ids <- createDataPartition(dt$dt.frm[[dt$resp]], p = 0.6, list = FALSE)
+  trn.set <- dt$dt.frm[trn.ids,]
   
-  holdout_set <- dt$dt.frm[-training_ids,]
+  holdout.set <- dt$dt.frm[-trn.ids,]
   
-  validation_ids <- createDataPartition(holdout_set[[dt$resp]], p = 0.5, list = FALSE)
-  validation_set <- holdout_set[validation_ids, ]
-  test_set <- holdout_set[-validation_ids, ]
+  val.ids <- createDataPartition(holdout.set[[dt$resp]], p = 0.5, list = FALSE)
+  val.set <- holdout.set[val.ids, ]
+  tst.set <- holdout.set[-val.ids, ]
   
-  df.c <- list(trn = training_set
-              , val = validation_set
-              , tst = test_set
-              , training_ids = training_ids
-              , validation_ids = validation_ids)
+  df.c <- list(trn.asis = trn.set
+              , val.asis = val.set
+              , tst.asis = tst.set
+              , trn.ids = trn.ids
+              , val.ids = val.ids)
   class(df.c) <- "df.collection"
   return(df.c)
 }
 
 
 # beautiful boiler plate for creating the models
-get_or_train <- function(df, resp, algo, set = "trn"
+get_or_train <- function(df, resp, algo
+                         , set = "asis"
+                         , modelName = paste(algo
+                                             , set
+                                             , "model"
+                                             , sep = ".")
                          , tc = trainControl(method = "cv"
                                             , number = 5
                                             , allowParallel = TRUE)) {
-  
-  modelName <- paste(algo, set, sep = "_")
   modelFileName <- paste0(modelName, ".RData")
   
   if (file.exists(modelFileName)) {
@@ -196,26 +203,61 @@ get_or_train <- function(df, resp, algo, set = "trn"
 createModels <- function(df, resp, models, tCtrls) {
   # this needs a tidy up
   n <- nrow(models)
-  if (any(class(df) == "data.frame")) {
     for (m in 1:n) {
+      d <- if (any(class(df) == "data.frame")) { 
+        df
+      } else {
+        if (any(class(df) == "df.collection")) { 
+          df[[models[m, "trn.set"]]]
+        }
+      }
       assign(models[m,"model"]
-             , get_or_train(df, resp
+             , get_or_train(d, resp
                             , algo = models[m,"algo"]
-                            , set = models[m, "set"]
+                            , set = models[m, "trn.set"]
+                            , modelName = models[m, "model"]
                             , tc = tCtrls[[algo]])
-             , envir = .GlobalEnv
+      , envir = .GlobalEnv
       )
     }
-  return()}
-  if (any(class(df) == "df.collection")) {
-    for (m in 1:n) {
-      assign(models[m,"model"]
-             , get_or_train(df[[models[m, "set"]]], resp
-                            , algo = models[m,"algo"]
-                            , set = models[m, "set"]
-                            , tc = tCtrls[[algo]])
-             , envir = .GlobalEnv
-      )
-    }
-  return()}
 }
+
+createConfMats <- function(dt, resp, models) {
+  n <- nrow(models)
+  confmats <- data.frame()
+  for (m in 1:n) {
+    assign(models[m,"cmat"]
+           , confusionMatrix(predict(get(models[m, "model"])
+                                     , dt[[models[m,"val.set"]]])
+                             , dt[[models[m,"val.set"]]][, resp]
+           )
+    , envir = .GlobalEnv
+    )
+    confmats <- rbind(confmats
+                      , cbind.data.frame(model =  models[m, "model"]
+                                         ,  get(models[m, "cmat"])$table)
+                      )
+  }
+  return(confmats)
+}
+
+myConfMatsPlot <- function(cf) {
+  levelplot(sqrt(Freq)~Prediction+Reference | model
+            , data = cf
+            , shrink = c(0.25, 1)
+            , col.regions = myPal.range
+            , strip = MyLatticeStrip
+            , scales = list(x = list(alternating = c(1,0,1)
+                                     , tck = 1:0                                   )
+                            , y = list(alternating = c(0,3))
+                            , rot = 30
+            )
+            , between = list(x = 0.2, y = 0.2)
+            , par.settings = MyLatticeTheme
+            , main = list(label = "Levelplots of the confusion matrices"
+                          , cex = 0.8)
+            , sub = list(label = expression(paste("Colour and size scaled for emphasis to ", sqrt("Frequency")))
+                         , cex = 0.75)
+  )
+}
+  
