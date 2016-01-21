@@ -33,8 +33,9 @@ trn.val.tst <- myStandardPartitioning(dt)
 # for example
 myPreProc <- preProcess(trn.val.tst$trn[-dt$respCol]
                         , method = "pca"
-                        , thresh = 0.8)
+                        , thresh = 0.9)
 
+# the new data frame must be named as a set in the model config
 trn.val.tst$pca <- predict(myPreProc, trn.val.tst$trn)
 # The number of predictor dimensions has been reduced to:                      
 dim(trn.val.tst$pca)[2] -1
@@ -42,6 +43,6 @@ dim(trn.val.tst$pca)[2] -1
 # create the models
 # df version
 createModels(trn.val.tst, dt$resp, models, tCtrls)
-# dt version - will try to match model config with dt_collection members
+# dt version - will try to match model config with dt_collection members by set name
 
 

@@ -98,11 +98,11 @@ myDensityPlot <- function(j, df, resp, pnts = TRUE) {
   )
 }
 
-#layoutPlots_4 <- function(vars, plotFunc, df) {
-  print(plotFunc(vars[1], df), pos = c(0,0.5, 0.5, 1), more = TRUE)
-  print(plotFunc(vars[2], df), pos = c(0.5, 0.5, 1, 1), more = TRUE)
-  print(plotFunc(vars[3], df), pos = c(0, 0, 0.5, 0.5), more = TRUE)
-  print(plotFunc(vars[4], df), pos = c(0.5, 0, 1, 0.5))
+layoutPlots_4 <- function(vars, plotFunc, df, ...) {
+  print(plotFunc(vars[1], df, ...), pos = c(0,0.5, 0.5, 1), more = TRUE)
+  print(plotFunc(vars[2], df, ...), pos = c(0.5, 0.5, 1, 1), more = TRUE)
+  print(plotFunc(vars[3], df, ...), pos = c(0, 0, 0.5, 0.5), more = TRUE)
+  print(plotFunc(vars[4], df, ...), pos = c(0.5, 0, 1, 0.5))
 }
 
 # the following code takes a data frame 
@@ -194,8 +194,7 @@ get_or_train <- function(df, resp, algo, set = "trn"
 }
 
 createModels <- function(df, resp, models, tCtrls) {
-  # still need to do a vesrion that works on the dt_collection class
-  # and uses the right data set from within the class.
+  # this needs a tidy up
   n <- nrow(models)
   if (any(class(df) == "data.frame")) {
     for (m in 1:n) {
@@ -218,6 +217,5 @@ createModels <- function(df, resp, models, tCtrls) {
              , envir = .GlobalEnv
       )
     }
-    print("in df.col")
   return()}
 }
