@@ -4,14 +4,14 @@ source("utilityCode.R")
 # give this run a unique name - TO DO implement this
 thisRun <- "uniqueName"
 
-# problem type, either classification or regression
-ptype <- "regression"
-
 # configure the data frame here
 # refer out to any custom code, to do the basics
 # such as making appropriate factors, ditching obviously useless columns
 data("diamonds")
 dt <- setData(diamonds, "price")
+
+# problem type, either classification or regression, can be over-ridden
+ptype <- if (is.numeric(dt$resp)) { "regression" } else { "classification"}
 
 # use the EDA file to explore the data
 # do anything you can to the wholesale data set before partitioning
