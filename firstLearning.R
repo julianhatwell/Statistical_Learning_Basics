@@ -71,4 +71,8 @@ if (ptype == "classification") {
 
 # look at the buildTime v accuracy stats
 modelStats <- compareModelStats(models, ptype)
+# for regression problems, also look at the MAD
+if (ptype == "classification") {
+  modelStats <- MADmodelStats(models, modelStats, "val.set", trn.val.tst, dt$resp, preds)
+}
 compareModelStatsPlot(modelStats, ptype)

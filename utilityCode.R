@@ -317,6 +317,20 @@ compareModelStats <- function(models, ptype) {
   return(modelStats)
 }
 
+MADmodelStats <- function(models, ms, type, df, resp, preds) {
+  n <- nrow(models)
+  MAD <- numeric(n)
+  for (m in 1:n) {
+    diffs <- preds[preds$model == models[m, "model"], "prediction"] - 
+                           df[[models[m, type]]][resp]
+    MAD[m] <- round(mad(diffs[[1]]),4)
+        
+  }
+  modelStats <- cbind(ms, MAD)
+  return(modelStats)
+}
+
+
 compareModelStatsPlot <- function(ms, ptype) {
   if (ptype == "regression") {
     fmla <- as.formula("RMSE ~ buildTimes")
