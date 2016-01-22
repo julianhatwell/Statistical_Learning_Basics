@@ -173,6 +173,7 @@ myStandardPartitioning <- function(dt, seed = 23) {
 get_or_train <- function(df, resp, algo
                          , set = "asis"
                          , modelName
+                         , tg = NA
                          , tc = trainControl(method = "cv"
                                             , number = 5
                                             , allowParallel = TRUE)) {
@@ -188,11 +189,24 @@ get_or_train <- function(df, resp, algo
     # build the model
     fmla <- as.formula(paste0(resp, "~."))
     modelTrain <- function(fmla, df, algo, ...) {
-      train(fmla, data = df, method = algo, ...)
+      dots <- list(...)
+      argList <- list(fmla, data = df, method = algo)
+      
+      if (any(names(dots) == "trControl")) {
+        if (!(is.na(dots["trControl"]))) {
+          argList["trControl"] <- dots["trControl"]
+        }
+      }
+      
+      if (any(names(dots) == "tuneGrid")) {
+        if (!(is.na(dots["tuneGrid"]))) {
+          argList["tuneGrid"] <- dots["tuneGrid"]
+        }
+      }
+      do.call(train, argList)
     }
-    print(modelTrain)
-    assign(modelName, train(fmla, data = df, method = algo
-                            , trControl = tc)
+    assign(modelName, modelTrain(fmla, df, algo
+                            , tuneGrid = tg, trControl = tc)
            , envir = .GlobalEnv)
     
     # close parallel processing
@@ -217,12 +231,15 @@ createModels <- function(df, resp, models) {
           df[[models[m, "trn.set"]]]
         }
       }
+      tc <- if (exists(models[m, "control"])) { get(models[m, "control"]) } else { NA }
+      tg <- if (exists(models[m, "grid"])) { get(models[m, "grid"]) } else { NA }
       assign(models[m,"model"]
              , get_or_train(d, resp
                             , algo = models[m,"algo"]
                             , set = models[m, "trn.set"]
                             , modelName = models[m, "model"]
-                            , tc = get(models[m, "control"]))
+                            , tc = tc
+                            , tg = tg)
       , envir = .GlobalEnv
       )
     }
