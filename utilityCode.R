@@ -176,7 +176,8 @@ get_or_train <- function(df, resp, algo
                          , tg = NA
                          , tc = trainControl(method = "cv"
                                             , number = 5
-                                            , allowParallel = TRUE)) {
+                                            , allowParallel = TRUE)
+                         , seed = 1001) {
   modelFileName <- paste0(modelName, ".RData")
   
   if (file.exists(modelFileName)) {
@@ -187,6 +188,7 @@ get_or_train <- function(df, resp, algo
     registerDoParallel(p_clus)
     
     # build the model
+    set.seed(seed) # ensure same resampling ids over multiple iters
     fmla <- as.formula(paste0(resp, "~."))
     modelTrain <- function(fmla, df, algo, ...) {
       dots <- list(...)
@@ -220,7 +222,7 @@ get_or_train <- function(df, resp, algo
   return(model)
 }
 
-createModels <- function(df, resp, models) {
+createModels <- function(df, resp, models, seed) {
   # this needs a tidy up
   n <- nrow(models)
     for (m in 1:n) {
@@ -239,7 +241,8 @@ createModels <- function(df, resp, models) {
                             , set = models[m, "trn.set"]
                             , modelName = models[m, "model"]
                             , tc = tc
-                            , tg = tg)
+                            , tg = tg
+                            , seed = seed)
       , envir = .GlobalEnv
       )
     }
