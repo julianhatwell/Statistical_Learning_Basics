@@ -22,10 +22,12 @@ createModelMatrix <- function(algorithms, sets) {
                   , sets = sets
                   , trn.set = paste0("trn.",sets)
                   , val.set = paste0("val.",sets)
-                  , tst.set = paste0("tst.",sets))
+                  , tst.set = paste0("tst.",sets)
+                  , control = paste0(rep(algorithms, each = length(sets)), ".tc")
+                  , grid = paste0(rep(algorithms, each = length(sets)), ".grid"))
   models <- cbind(models
-                  , model = paste(models[,1]
-                                  , models[,2]
+                  , model = paste(models[, "algo"]
+                                  , models[, "sets"]
                                   , "model"
                                   , sep = ".")
   )
@@ -170,10 +172,7 @@ myStandardPartitioning <- function(dt, seed = 23) {
 # beautiful boiler plate for creating the models
 get_or_train <- function(df, resp, algo
                          , set = "asis"
-                         , modelName = paste(algo
-                                             , set
-                                             , "model"
-                                             , sep = ".")
+                         , modelName
                          , tc = trainControl(method = "cv"
                                             , number = 5
                                             , allowParallel = TRUE)) {
@@ -188,7 +187,13 @@ get_or_train <- function(df, resp, algo
     
     # build the model
     fmla <- as.formula(paste0(resp, "~."))
-    assign(modelName, train(fmla, data = df,  trControl = tc, method = algo))
+    modelTrain <- function(fmla, df, algo, ...) {
+      train(fmla, data = df, method = algo, ...)
+    }
+    print(modelTrain)
+    assign(modelName, train(fmla, data = df, method = algo
+                            , trControl = tc)
+           , envir = .GlobalEnv)
     
     # close parallel processing
     stopCluster(p_clus)
@@ -201,7 +206,7 @@ get_or_train <- function(df, resp, algo
   return(model)
 }
 
-createModels <- function(df, resp, models, tCtrls) {
+createModels <- function(df, resp, models) {
   # this needs a tidy up
   n <- nrow(models)
     for (m in 1:n) {
@@ -217,7 +222,7 @@ createModels <- function(df, resp, models, tCtrls) {
                             , algo = models[m,"algo"]
                             , set = models[m, "trn.set"]
                             , modelName = models[m, "model"]
-                            , tc = tCtrls[[algo]])
+                            , tc = get(models[m, "control"]))
       , envir = .GlobalEnv
       )
     }
@@ -240,43 +245,6 @@ generatePredictions <- function(dt, models, type = "val.set") {
     
   }
   return(predictions)
-}
-
-createConfMats <- function(preds, type = "val.set", dt, resp, models) {
-  n <- nrow(models)
-  confmats <- data.frame()
-  for (m in 1:n) {
-    assign(models[m,"cmat"]
-           , confusionMatrix(preds[preds$model == models[m, "model"], "prediction"]
-                             , dt[[models[m, type]]][[resp]])
-           , envir = .GlobalEnv
-    )
-    confmats <- rbind(confmats
-                      , cbind.data.frame(model =  models[m, "model"]
-                                         ,  get(models[m, "cmat"])$table)
-    )
-  }
-  return(confmats)
-}
-
-myConfMatsPlot <- function(cf) {
-  levelplot(sqrt(Freq)~Prediction+Reference | model
-            , data = cf
-            , shrink = c(0.25, 1)
-            , col.regions = myPal.range
-            , strip = MyLatticeStrip
-            , scales = list(x = list(alternating = c(1,0,1)
-                                     , tck = 1:0                                   )
-                            , y = list(alternating = c(0,3))
-                            , rot = 30
-            )
-            , between = list(x = 0.2, y = 0.2)
-            , par.settings = MyLatticeTheme
-            , main = list(label = "Levelplots of the confusion matrices"
-                          , cex = 0.8)
-            , sub = list(label = expression(paste("Colour and size scaled for emphasis to ", sqrt("Frequency")))
-                         , cex = 0.75)
-  )
 }
 
 compareModelStats <- function(models, ptype) {
@@ -330,15 +298,14 @@ MADmodelStats <- function(models, ms, type, df, resp, preds) {
   return(modelStats)
 }
 
-
 compareModelStatsPlot <- function(ms, ptype) {
   if (ptype == "regression") {
-    fmla <- as.formula("RMSE ~ buildTimes")
+    fmla <- as.formula("RMSE + MAD ~ buildTimes")
   }
   if (ptype == "classification") {
-    fmla <- as.formula("cvAccuracy~buildTimes")
+    fmla <- as.formula("OOS_Err_cv~buildTimes")
   }
-  xyplot(fmla, data = ms
+  xyplot(fmla, groups = model, data = ms
          , prepanel = function(x, y, type, ...) {
              prepanel.default.xyplot(c(min(x) - 0.1, max(x) + 0.1)
                                      , c(min(y) - 0.01, max(y) + 0.01)
@@ -347,15 +314,52 @@ compareModelStatsPlot <- function(ms, ptype) {
          , panel = function(x,y) {
              panel.xyplot(x, y
                           , pch = 19
-                          , col = myPal[5]
+                          , col = myPal
                           , alpha = 1)
              panel.text(x, y, pos = 1
                         , modelStats$model)
          }
-         , scales = list(tck = 1:0)
+         , scales = list(relation = "sliced", tck = 1:0)
          , main = "Model Performance and Training Times"
          , xlab = "Training Time (seconds)"
-         , ylab = "Out of sample accuracy estimate"
+         , ylab = "Error Rate Estimates"
          , par.settings = MyLatticeTheme
          )
+}
+
+createConfMats <- function(preds, type = "val.set", dt, resp, models) {
+  n <- nrow(models)
+  confmats <- data.frame()
+  for (m in 1:n) {
+    assign(models[m,"cmat"]
+           , confusionMatrix(preds[preds$model == models[m, "model"], "prediction"]
+                             , dt[[models[m, type]]][[resp]])
+           , envir = .GlobalEnv
+    )
+    confmats <- rbind(confmats
+                      , cbind.data.frame(model =  models[m, "model"]
+                                         ,  get(models[m, "cmat"])$table)
+    )
+  }
+  return(confmats)
+}
+
+myConfMatsPlot <- function(cf) {
+  levelplot(sqrt(Freq)~Prediction+Reference | model
+            , data = cf
+            , shrink = c(0.25, 1)
+            , col.regions = myPal.range
+            , strip = MyLatticeStrip
+            , scales = list(x = list(alternating = c(1,0,1)
+                                     , tck = 1:0                                   )
+                            , y = list(alternating = c(0,3))
+                            , rot = 30
+            )
+            , between = list(x = 0.2, y = 0.2)
+            , par.settings = MyLatticeTheme
+            , main = list(label = "Levelplots of the confusion matrices"
+                          , cex = 0.8)
+            , sub = list(label = expression(paste("Colour and size scaled for emphasis to ", sqrt("Frequency")))
+                         , cex = 0.75)
+  )
 }
