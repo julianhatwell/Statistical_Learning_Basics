@@ -25,12 +25,12 @@ dt <- setData(diamonds, "price")
 trn.val.tst <- myStandardPartitioning(dt)
 
 # choose your statistical learning method
-algorithms <- c("lm", "foba", "lasso")
+algorithms <- c("lm", "foba", "lasso", "brnn")
+
 # set up the train controls for each model
 # to customise for any model, over-write the default
-tCtrls <- list()
 for (algo in algorithms) {
-  tCtrls[[algo]] <- trainControl(method = "cv", number = 4, allowParallel = TRUE)
+  assign(paste0(algo, ".tc"), trainControl(method = "cv", number = 4, allowParallel = TRUE))
 }
 
 # TO DO - implement tune grids
@@ -58,21 +58,22 @@ trn.val.tst$tst.pca <- predict(myPreProc, trn.val.tst$tst.asis)
 models <- createModelMatrix(algorithms, sets)
 
 # create the models
-createModels(trn.val.tst, dt$resp, models, tCtrls)
+createModels(trn.val.tst, dt$resp, models)
 
-preds <- generatePredictions(trn.val.tst, models, "val.set")
+trnPreds <- generatePredictions(trn.val.tst, models, "trn.set")
+valPreds <- generatePredictions(trn.val.tst, models, "val.set")
 testPreds <- generatePredictions(trn.val.tst, models, "tst.set")
+
+# look at the buildTime v error rate stats
+modelStats <- compareModelStats(models, ptype)
+# for regression problems, also look at the MAD
+if (ptype == "regression") {
+  modelStats <- MADmodelStats(models, modelStats, "trn.set", trn.val.tst, dt$resp, trnPreds)
+}
+compareModelStatsPlot(modelStats, ptype)
 
 # for classification problems, build a confusion matrix index from the built models
 if (ptype == "classification") {
-  confmats <- createConfMats(preds, "val.set", trn.val.tst, dt$resp, models)
+  confmats <- createConfMats(valPreds, "val.set", trn.val.tst, dt$resp, models)
   myConfMatsPlot(confmats)
 }
-
-# look at the buildTime v accuracy stats
-modelStats <- compareModelStats(models, ptype)
-# for regression problems, also look at the MAD
-if (ptype == "classification") {
-  modelStats <- MADmodelStats(models, modelStats, "val.set", trn.val.tst, dt$resp, preds)
-}
-compareModelStatsPlot(modelStats, ptype)
