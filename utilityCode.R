@@ -1,3 +1,4 @@
+library(httr)
 library(caret)
 library(dplyr)
 library(lattice)
@@ -5,8 +6,13 @@ library(ggplot2)
 library(parallel)
 library(doParallel)
 
-source("https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R")
-source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/myFirstTheme.R")
+if (connected) {
+  source("https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R")
+  source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/myFirstTheme.R")
+} else {
+  source("C:\\Dev\\Study\\R\\Utilities\\Utilities.R")
+  source("C:\\Dev\\Study\\R\\R_Themes\\myFirstTheme.R")
+}
 
 # default data pack
 data("diamonds")
