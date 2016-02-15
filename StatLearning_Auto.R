@@ -1,32 +1,40 @@
-connected <- FALSE
+# can access github utilities?
+connected <- TRUE
+
+# give this run a unique name
+thisRun <- "1"
+
 # stat learning project set up
 source("utilityCode.R")
 source("tuneGrids.R")
-
-# give this run a unique name - TO DO implement this
-thisRun <- "uniqueName"
 
 # configure the data frame here
 # refer out to any custom code, to do the basics
 # such as making appropriate factors, ditching obviously useless columns
 
-# defaults
-# data("diamonds")
-# dt <- setData(diamonds, "price")
-
 library(ISLR)
-dt <- setData(Auto, "mpg")
+Auto1 <- Auto[, -9]
+Auto1$origin <- factor(Auto1$origin)
+dt <- setData(Auto1, "mpg")
 
 # problem type, either classification or regression, can be over-ridden
 ptype <- if (is.numeric(dt$dt.frm[[dt$resp]])) { "regression" } else { "classification"}
 
 # use the EDA file to explore the data
 # do anything you can to the wholesale data set before partitioning
+# pick apporpriate funcs from the various checks file
+
 # such as removing entire columns
 # creating dummy variables out of factors if required
-# NB this is not currently working as expected
-# commented out for now
-# dt$dt.frm <- createDummies(dt$dt.frm, dt$resp)
+dt$dt.frm <- createDummies(dt$dt.frm, dt$resp)
+# always reset the object after a change
+dt <- setData(dt$dt.frm, "mpg")
+
+# check for highly correlated predictors
+cor.vars.check(dt, 0.8)
+
+# and remove them
+# to implement correctly -- dt$dt.frm <- dt$dt.frm[,-(cor.vars.check(dt, 0.8))]
 
 # partition the data here for modeling and validation
 trn.val.tst <- myStandardPartitioning(dt)

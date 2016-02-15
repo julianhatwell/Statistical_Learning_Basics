@@ -1,4 +1,3 @@
-library(httr)
 library(caret)
 library(dplyr)
 library(lattice)
@@ -124,7 +123,9 @@ layoutPlots_4 <- function(vars, plotFunc, df, ...) {
 createDummies <- function(df, resp) {
   fmla <- as.formula(paste0(resp, "~."))
   dummify <- dummyVars(fmla,data = df)
-  return(as.data.frame(predict(dummify, df)))
+  dummify <- cbind(df[[resp]], as.data.frame(predict(dummify, df)))
+  names(dummify)[1] <- dt$resp
+  return(dummify)
 }
 
 # look for NAs
@@ -142,10 +143,19 @@ nzv.check <- function(dt) {
 }
 
 # look for highly correlated vars
-cor.vars.check <- function(dt, ctff = 0.75) {
+cor.vars.check <- function(dt, ctff = 0.75, rmv = FALSE) {
   cor.dt <- cor(dt$dt.frm[,dt$vars[!dt$vars_fac]])
-  summary(cor.dt[upper.tri(cor.dt)])
+  # summary(cor.dt[upper.tri(cor.dt)])
+  if (rmv) {
+  df <- cbind(dt$dt.frm[[dt$resp]]
+                  , dt$dt.frm[,-(findCorrelation(cor.dt, cutoff = ctff))]
+                  )
+  names(df)[1] <- dt$resp
+  return(df)
+  }
+  else {
   return(findCorrelation(cor.dt, cutoff = ctff))
+  }
 }
 
 # look for linear dependencies
@@ -184,7 +194,7 @@ get_or_train <- function(df, resp, algo
                                             , number = 5
                                             , allowParallel = TRUE)
                          , seed = 1001) {
-  modelFileName <- paste0(modelName, ".RData")
+  modelFileName <- paste0(modelName, "_", thisRun, ".RData")
   
   if (file.exists(modelFileName)) {
     attach(modelFileName, warn.conflicts = FALSE)

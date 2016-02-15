@@ -1,3 +1,4 @@
+connected <- TRUE
 # stat learning project set up
 source("utilityCode.R")
 source("tuneGrids.R")
