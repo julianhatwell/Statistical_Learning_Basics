@@ -145,16 +145,12 @@ nzv.check <- function(dt) {
 # look for highly correlated vars
 cor.vars.check <- function(dt, ctff = 0.75, rmv = FALSE) {
   cor.dt <- cor(dt$dt.frm[,dt$vars[!dt$vars_fac]])
-  # summary(cor.dt[upper.tri(cor.dt)])
+  cor.cols <- names(dt$dt.frm[,dt$vars[!dt$vars_fac]])[findCorrelation(cor.dt, cutoff = ctff)]
   if (rmv) {
-  df <- cbind(dt$dt.frm[[dt$resp]]
-                  , dt$dt.frm[,-(findCorrelation(cor.dt, cutoff = ctff))]
-                  )
-  names(df)[1] <- dt$resp
-  return(df)
+    return(dt$dt.frm[,!(names(dt$dt.frm) %in% cor.cols)])
   }
   else {
-  return(findCorrelation(cor.dt, cutoff = ctff))
+    return(cor.cols)
   }
 }
 

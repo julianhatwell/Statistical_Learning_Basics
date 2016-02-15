@@ -32,9 +32,10 @@ dt <- setData(dt$dt.frm, "mpg")
 
 # check for highly correlated predictors
 cor.vars.check(dt, 0.8)
-
 # and remove them
-# to implement correctly -- dt$dt.frm <- dt$dt.frm[,-(cor.vars.check(dt, 0.8))]
+cor.vars.check(dt, 0.8, rmv = TRUE)
+# always reset the object after a change
+dt <- setData(dt$dt.frm, "mpg")
 
 # partition the data here for modeling and validation
 trn.val.tst <- myStandardPartitioning(dt)
