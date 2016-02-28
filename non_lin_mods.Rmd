@@ -1,0 +1,96 @@
+Non-linear Models
+=================
+
+```{r}
+require(ISLR)
+attach(Wage)
+```
+
+Polynomials
+-----------
+Single variable: age
+```{r}
+fit <- lm(wage~poly(age,4), data = Wage)
+summary(fit)
+```
+
+The function poly generates a basis of *orthogonal polynomials*.
+
+The parament raw=TRUE can be added to return the polynomials directly:
+
+```{r}
+fit <- lm(wage~poly(age,4, raw = TRUE), data = Wage)
+summary(fit)
+```
+
+To make a plot of the fitted function along with the standard errors:
+```{r, fig.width=7, fig.height=6}
+age.lims <- round(range(age),0)
+age.grid <- seq(from = age.lims[1], to = age.lims[2])
+preds <- predict(fit, newdata = list(age = age.grid), se = TRUE)
+se.bands <- cbind(preds$fit - preds$se.fit * 1.96
+                  , preds$fit + preds$se.fit * 1.96)
+plot(wage~age, col = "darkgrey")
+lines(age.grid, preds$fit, lwd=2, col = "blue")
+matlines(age.grid, se.bands, lty = 2, col = "blue")
+```
+
+ANOVA to determine polynomial degree
+====================================
+Using a hypothesis test to determine the degree of polynomial to use.
+
+```{r}
+fit.1=lm(wage∼age,data=Wage)
+fit.2=lm(wage∼poly(age,2),data=Wage)
+fit.3=lm(wage∼poly(age,3),data=Wage)
+fit.4=lm(wage∼poly(age,4),data=Wage)
+fit.5=lm(wage∼poly(age,5),data=Wage)
+anova(fit.1,fit.2,fit.3,fit.4,fit.5)
+```
+
+Polynomial Logistic Regression
+------------------------------
+```{r}
+fit <- glm(I(wage>250)~poly(age,4), data = Wage, family = binomial)
+summary(fit)
+preds <- predict(fit, newdata = list(age = age.grid), se = TRUE)
+se.bands <- preds$fit + cbind(fit = 0
+                              , lower = -1.96 * preds$se.fit
+                              , upper = 1.96 * preds$se.fit)
+```
+
+This computed on the logit scale. We can convert to the probability scale by mapping to the inverse logit:
+
+$$p=\frac{e^\eta}{1+e^\eta}$$
+
+```{r}
+prob.bands <- exp(se.bands)/(1+exp(se.bands))
+matplot(age.grid, prob.bands, col = "blue", lty = c(1,2,2), type = "l", ylim = c(0, 0.1))
+points(jitter(age), I(wage >250)/10, pch="i", cex = 0.5)
+```
+
+Splines
+-------
+Splines are more lexible that polynoms
+```{r}
+require(splines)
+fit <- lm(wage~bs(age, knots = c(25,40,60)), data = Wage)
+plot(age,wage, col = "darkgrey")
+lines(age.grid, predict(fit, list(age = age.grid)), col = "darkgreen", lwd = 2)
+abline(v=c(25,40,60), lty=2, col = "darkgreen")
+```
+bs by default gives a cubic polynom by default. They are only discontinuous in the third derivative (for cubic).
+
+Smoothing splines don't require a knot selection.
+```{r, eval = FALSE}
+fit <- smooth.spline(age, wage, df=16)
+lines(fit, col = "red", lwd = 2)
+```
+
+Or can tell it to use cross validation to choose df automatically
+```{r, eval = FALSE}
+fit <- smooth.spline(age, wage, cv = TRUE)
+lines(fit, col = "purple", lwd = 2)
+fit
+```
+
