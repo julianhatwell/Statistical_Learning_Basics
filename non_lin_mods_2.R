@@ -313,3 +313,125 @@ anova(gam1, gam2, gam3, gam4, gam5, gam6, gam7, gam8)
 
 # bit of trial and error but looks like gam7 is the one
 plot(gam7)
+
+# question 8
+# Auto, evidence of non-lin in the weight/disp/hp vs mpg (the three are highly correl)
+# also accel vs mpg
+library(ISLR)
+attach(Auto)
+plot(weight, mpg, col = "lightgrey")
+
+# poly nom?
+library(boot) # contains cv.glm for doing K-Fold on a glm
+k <- 5
+pn <- 10
+deltas <- rep(NA, pn)
+
+for (j in 1:pn) {
+  set.seed(12)
+  fit <- glm(mpg ~ poly(weight, j), data = Auto)
+  deltas[j] <- cv.glm(Auto, fit, K = k)$delta[2]
+}
+best.poly <- which.min(deltas)
+plot(deltas, xlab = "Degree", ylab = "Test MSE", type = "l")
+points(best.poly, deltas[best.poly], col = "red", cex = 2, pch = 20)
+
+# set up for function plots
+weight.lims <- range(weight)
+weight.grid <- seq(weight.lims[1], weight.lims[2], 1) 
+
+lm.poly <- lm(mpg~poly(weight, best.poly))
+pred.poly <- predict(lm.poly, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.poly, col = "blue", lwd = 2)
+
+library(gam)
+# smooth spline
+gam.spline <- gam(mpg~s(weight,best.poly))
+pred.gam.spline <- predict(gam.spline, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.gam.spline, col = "blue", lwd = 2)
+
+# loess
+gam.loess <- gam(mpg~lo(weight,2))
+pred.gam.loess <- predict(gam.loess, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.gam.loess, col = "blue", lwd = 2)
+
+# inverse relationship
+gam.inv <- gam(mpg~I(1/weight))
+pred.gam.inv <- predict(gam.inv, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.gam.inv, col = "blue", lwd = 2)
+
+# acceleration
+for (j in 1:pn) {
+  set.seed(12)
+  fit <- glm(mpg ~ poly(acceleration, j), data = Auto)
+  deltas[j] <- cv.glm(Auto, fit, K = k)$delta[2]
+}
+
+best.poly <- which.min(deltas)
+plot(deltas, xlab = "Degree", ylab = "Test MSE", type = "l")
+points(best.poly, deltas[best.poly], col = "red", cex = 2, pch = 20)
+
+# set up for function plots
+acceleration.lims <- range(acceleration)
+acceleration.grid <- seq(acceleration.lims[1], acceleration.lims[2], 0.1) 
+
+lm.poly <- lm(mpg~poly(acceleration, best.poly))
+pred.poly <- predict(lm.poly, data.frame(acceleration = acceleration.grid))
+
+plot(acceleration, mpg, col = "lightgrey")
+lines(acceleration.grid, pred.poly, col = "blue", lwd = 2)
+
+# smooth spline
+gam.spline <- gam(mpg~s(acceleration,best.poly))
+pred.gam.spline <- predict(gam.spline, data.frame(acceleration = acceleration.grid))
+
+plot(acceleration, mpg, col = "lightgrey")
+lines(acceleration.grid, pred.gam.spline, col = "blue", lwd = 2)
+
+# loess
+gam.loess <- gam(mpg~lo(acceleration,2))
+pred.gam.loess <- predict(gam.loess, data.frame(acceleration = acceleration.grid))
+
+plot(acceleration, mpg, col = "lightgrey")
+lines(acceleration.grid, pred.gam.loess, col = "blue", lwd = 2)
+
+# step func at year
+year.grid <- factor(unique(Auto$year))
+Auto$year_f <- factor(Auto$year)
+gam.step <- gam(mpg~year_f, data = Auto)
+pred.gam.step <- predict(gam.step, data.frame(year_f = year.grid))
+
+plot(Auto$year_f, Auto$mpg, col = "lightgrey")
+lines(year.grid, pred.gam.step, col = "blue", lwd = 2)
+
+# question 9
+library(MASS)
+libbrary(boot)
+attach(Boston)
+plot(nox, dis, col = "lightgrey")
+
+glm.cubic <- glm(dis~poly(nox,3), data = Boston)
+summary(glm.cubic)
+nox.lims <- range(nox)
+nox.lims
+nox.grid <- seq(nox.lims[1], nox.lims[2], 0.01)
+pred.glm.cubic <- predict(glm.cubic, data.frame(nox = nox.grid))
+lines(nox.grid, pred.glm.cubic, col = "blue", lwd = 2)
+
+pn <- 10
+val.errors <- rep(NA,10)
+for (j in 1:pn) {
+  glm.cubic <- glm(dis~poly(nox,j), data = Boston)
+  val.errors[j] <- cv.glm(Boston, glm.cubic, K = 5)$delta[2]
+}
+best.poly <- which.min(deltas)
+plot(deltas, xlab = "Degree", ylab = "CV MSE", type = "l")
+points(best.poly, deltas[best.poly], col = "red", cex = 2, pch = 20)
