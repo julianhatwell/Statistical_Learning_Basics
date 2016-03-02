@@ -414,7 +414,7 @@ lines(year.grid, pred.gam.step, col = "blue", lwd = 2)
 
 # question 9
 library(MASS)
-libbrary(boot)
+library(boot)
 attach(Boston)
 plot(nox, dis, col = "lightgrey")
 
@@ -435,3 +435,111 @@ for (j in 1:pn) {
 best.poly <- which.min(deltas)
 plot(deltas, xlab = "Degree", ylab = "CV MSE", type = "l")
 points(best.poly, deltas[best.poly], col = "red", cex = 2, pch = 20)
+
+# rspline
+glm.rspline <- glm(dis~bs(nox,4), data = Boston)
+summary(glm.rspline)
+attr(bs(nox,4), "knots")
+
+pred.glm.rspline <- predict(glm.rspline, data.frame(nox = nox.grid))
+lines(nox.grid, pred.glm.cubic, col = "blue", lwd = 2)
+lines(nox.grid, pred.glm.rspline, col = "red", lwd = 2)
+
+val.errors <- rep(NA,10)
+for (j in 1:pn) {
+  glm.rspline <- glm(dis~bs(nox,j), data = Boston)
+  val.errors[j] <- cv.glm(Boston, glm.cubic, K = 5)$delta[2]
+}
+best.rspline <- which.min(deltas)
+plot(deltas, xlab = "Degree", ylab = "CV MSE", type = "l")
+points(best.rspline, deltas[best.rspline], col = "red", cex = 2, pch = 20)
+
+glm.cubic <- glm(dis~poly(nox,best.poly), data = Boston)
+glm.rspline <- glm(dis~bs(nox,best.rspline), data = Boston)
+pred.glm.cubic <- predict(glm.cubic, data.frame(nox = nox.grid))
+pred.glm.rspline <- predict(glm.rspline, data.frame(nox = nox.grid))
+
+plot(nox, dis, col = "lightgrey")
+lines(nox.grid, pred.glm.cubic, col = "blue", lwd = 2)
+lines(nox.grid, pred.glm.rspline, col = "red", lwd = 2)
+
+# question 10
+library(ISLR)
+library(leaps)
+set.seed(123)
+train <- sample(c(TRUE, FALSE), dim(College)[1], replace = TRUE, prob = c(0.9, 0.1))
+College.train <- College[train,]
+College.test <- College[!train,]
+College.fwd <- regsubsets(Outstate~., data = College, method = "forward", nvmax = 17)
+sum.College.fwd <- summary(College.fwd)
+
+plot(sum.College.fwd$adjr2)
+plot(sum.College.fwd$bic)
+plot(sum.College.fwd$cp)
+
+par(mfrow = c(1, 3))
+plot(sum.College.fwd$cp, xlab = "Number of variables", ylab = "Cp", type = "l")
+min.cp <- min(sum.College.fwd$cp)
+std.cp <- sd(sum.College.fwd$cp)/sqrt(length(sum.College.fwd$cp))
+abline(h = min.cp + std.cp, col = "red", lty = 2)
+abline(h = min.cp - std.cp, col = "red", lty = 2)
+plot(sum.College.fwd$bic, xlab = "Number of variables", ylab = "BIC", type='l')
+min.bic <- min(sum.College.fwd$bic)
+std.bic <- sd(sum.College.fwd$bic)/sqrt(length(sum.College.fwd$bic))
+abline(h = min.bic + std.bic, col = "red", lty = 2)
+abline(h = min.bic - std.bic, col = "red", lty = 2)
+plot(sum.College.fwd$adjr2, xlab = "Number of variables", ylab = "Adjusted R2", type = "l", ylim = c(0.4, 0.84))
+max.adjr2 <- max(sum.College.fwd$adjr2)
+std.adjr2 <- sd(sum.College.fwd$adjr2)/sqrt(length(sum.College.fwd$adjr2))
+abline(h = max.adjr2 + std.adjr2, col = "red", lty = 2)
+abline(h = max.adjr2 - std.adjr2, col = "red", lty = 2)
+
+# 6 components looks like the best
+coef(College.fwd, 6)
+par(mfrow =c(1,1))
+boxplot(Outstate~Private, data = College)
+xyplot(Outstate~Room.Board, data = College)
+xyplot(Outstate~PhD, data = College)
+xyplot(Outstate~perc.alumni, data = College)
+xyplot(Outstate~Expend, data = College)
+xyplot(Outstate~Grad.Rate, data = College)
+
+gam.basic <- gam(Outstate~Private+Room.Board+PhD+perc.alumni+Expend+Grad.Rate
+                 , data = College)
+
+preds.gam.basic <- predict(gam.basic, College.test)
+RSS <- mean((preds.gam.basic - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.basic)
+
+gam.E <- gam(Outstate~Private+Room.Board+PhD+perc.alumni+s(Expend, 3)+Grad.Rate
+                 , data = College)
+preds.gam.E <- predict(gam.E, College.test)
+RSS <- mean((preds.gam.E - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.E)
+
+gam.E5 <- gam(Outstate~Private+Room.Board+PhD+perc.alumni+s(Expend, 5)+Grad.Rate
+             , data = College)
+preds.gam.E5 <- predict(gam.E5, College.test)
+RSS <- mean((preds.gam.E5 - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.E5)
+# 5th df is not better than 3rd
+
+gam.mult <- gam(Outstate~Private+s(Room.Board,2)+s(PhD,2)+s(perc.alumni,2)+s(Expend, 3)+s(Grad.Rate,2)
+             , data = College)
+preds.gam.mult <- predict(gam.mult, College.test)
+RSS <- mean((preds.gam.mult - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.mult)
+# only expend is significant in nonlinear
+
