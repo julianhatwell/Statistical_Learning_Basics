@@ -1,0 +1,16 @@
+Maths forms
+
+$$G = \sum_{k=1}^K{\hat p_{mk}}(1-{\hat p_{mk}})$$
+
+
+```{r gini}
+# for every class K, sum of proportion K in region * proportion not K in region
+gini <- function(p) {
+  v <- p * (1-p)
+  sum(v)
+}
+
+# proportions will always add to 1
+p <- c(0.1, 0.1, 0.2, 0.6)
+
+```
