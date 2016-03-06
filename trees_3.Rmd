@@ -1,0 +1,98 @@
+```{r}
+library(ISLR)
+library(tree)
+
+set.seed(12)
+train <- sample(1:nrow(Carseats), nrow(Carseats) * 0.8)
+
+tree.carseats=tree(Sales???., data = Carseats, subset=train)
+plot(tree.carseats)
+text(tree.carseats, pretty = 0)
+```
+
+What's the test error rate:
+  
+```{r}
+yhat.tree <- predict(tree.carseats, newdata = Carseats[-train,])
+carseats.test <- Carseats$Sales[-train]
+plot(yhat.tree, carseats.test)
+abline(0,1)
+mean((yhat.tree-carseats.test)^2)
+sqrt(mean((yhat.tree-carseats.test)^2))
+```
+
+Will pruning the tree improve accuracy?
+
+```{r}
+set.seed(4)
+cv.carseats <- cv.tree(tree.carseats)
+plot(cv.carseats$size, cv.carseats$dev, type = "b")
+tree.min <- which.min(cv.carseats$dev)
+points(cv.carseats$size[tree.min], cv.carseats$dev[tree.min], col = "red", cex = 2, pch = 20)
+```
+
+In this case CV chooses a tree with 7 internal nodes.
+
+```{r}
+prune.carseats <- prune.tree(tree.carseats, best = 7)
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+```
+
+Test error with pruned tree
+
+```{r}
+yhat.prune <- predict(prune.carseats, newdata = Carseats[-train,])
+plot(yhat.prune, carseats.test)
+abline(0,1)
+mean((yhat.prune-carseats.test)^2)
+sqrt(mean((yhat.prune-carseats.test)^2))
+```
+
+Use bagging
+
+```{r}
+library(randomForest)
+set.seed(4)
+bag.carseats <- randomForest(Sales~., data = Carseats
+                            , subset = train
+                            , mtry = 10
+                            , importance = TRUE)
+```
+
+```{r}
+yhat.bag <- predict(bag.carseats, newdata = Carseats[-train,])
+plot(yhat.bag, carseats.test)
+abline(0,1)
+mean((yhat.bag-carseats.test)^2)
+sqrt(mean((yhat.bag-carseats.test)^2))
+
+importance(bag.carseats)
+varImpPlot(bag.carseats)
+```
+
+now use RF
+
+```{r}
+Carseats.train <- Carseats[train,]
+Carseats.test <- Carseats[-train,]
+set.seed(4)
+p <- c(2, 3, 6)
+nt <- 500
+val.errors <- matrix(NA, nt, 3)
+
+for (i in 1:nt) {
+  for (j in 1:3) {
+    rf.carseats <- randomForest(Sales~.
+                              , data = Carseats.train
+                              , ntree = i, mtry = p[j])
+    yhat.rf <- predict(rf.carseats, newdata = Carseats.test)
+    val.errors[i,j] <-  mean((yhat.rf-Carseats.test$medv)^2)
+  }
+  importance(rf.carseats)
+  varImpPlot(rf.carseats)
+}
+
+matplot(1:500, val.errors, type = "l")
+```
+
