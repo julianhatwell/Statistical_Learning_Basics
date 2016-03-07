@@ -405,3 +405,92 @@ plot(lambda.grid, test.errors, type = "l")
 lambda.grid[which.min(test.errors[lambda.grid < 0.04])]
 ```
 
+compare with LM
+
+```{r}
+hitters.lm <- lm(Salary~., Hitters.clean, subset = train)
+pred.hitters.lm <- predict(hitters.lm, Hitters.clean[-train,])
+
+plot(pred.hitters.lm, Hitters.clean$Salary[-train])
+abline(0,1)
+
+mean((pred.hitters.lm - Hitters.clean$Salary[-train])^2)
+```
+
+compare with lasso
+```{r}
+library(glmnet)
+# create the model matrix
+x <- model.matrix(Salary~., data = Hitters.clean)
+y <- Hitters.clean$Salary
+set.seed(71)
+cv.hitters.lasso <- cv.glmnet(x[train,], y[train], alpha = 1)
+plot(cv.hitters.lasso)
+
+bestlam.lasso <- cv.hitters.lasso$lambda.min
+bestlam.lasso
+
+fit.lasso <- glmnet(x[train,],y[train],alpha=1)
+plot(fit.lasso, xvar = "lambda")
+
+# MSE associated with the best value of lambda
+lasso.pred.best <- predict(fit.lasso, s=bestlam.lasso, newx = x[-train,])
+mean((lasso.pred.best-y[-train])^2) #MSE
+
+round(predict(fit.lasso, s=bestlam.lasso
+              , type = "coefficients"),4)
+```
+
+bagging
+
+```{r}
+hitters.bag <- randomForest(Salary~.
+                            , data = Hitters.clean
+                            , subset = train
+                            , mtry = 19)
+
+pred.hitters.bag <- predict(hitters.bag, Hitters.clean[-train,])
+
+plot(pred.hitters.bag, Hitters.clean$Salary[-train])
+abline(0,1)
+
+mean((pred.hitters.bag - Hitters.clean$Salary[-train])^2)
+```
+
+# Question 11
+```{r}
+library(ISLR)
+library(gbm)
+set.seed(1)
+train <- 1:1000
+Caravan$Purchase <- ifelse(Caravan$Purchase == "Yes", 1, 0)
+Caravan.train <- Caravan[train, ]
+Caravan.test <- Caravan[-train, ]
+
+set.seed(1)
+boost.caravan <- gbm(Purchase ~ ., data = Caravan.train, distribution = "gaussian", n.trees = 1000, shrinkage = 0.01)
+
+summary(boost.caravan)
+```
+
+```{r}
+probs.test <- predict(boost.caravan, Caravan.test, n.trees = 1000, type = "response")
+pred.test <- ifelse(probs.test > 0.2, 1, 0)
+table(pred.test, Caravan.test$Purchase)
+```
+
+```{r}
+logit.caravan <- glm(Purchase ~ ., data = Caravan.train, family = "binomial")
+probs.test2 <- predict(logit.caravan, Caravan.test, type = "response")
+
+pred.test2 <- ifelse(probs.test > 0.2, 1, 0)
+table(pred.test2, Caravan.test$Purchase)
+```
+
+```{r}
+library(class)
+knn.pred=knn(Caravan.train,Caravan.test,Caravan.train$Purchase,k=5)
+table(knn.pred,Caravan.test$Purchase)
+mean(knn.pred==Caravan.test$Purchase)
+```
+
