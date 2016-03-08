@@ -1,0 +1,197 @@
+# Support Vector Machines
+
+## Support vector classifiers and separating planes
+
+First set up some sim data
+
+```{r}
+library(e1071)
+set.seed(1)
+x <- matrix(rnorm(40), 20, 2)
+y <- c(rep(-1, 10), rep(1, 10))
+x[y==1,] <- x[y==1,]+1
+```
+
+Check if the classes are linearly separable.
+
+```{r}
+plot(x, col = y + 3, pch = 19)
+```
+
+They are not.
+
+svm function needs a factor to perform classification.
+
+```{r}
+dat <- data.frame(x, y = as.factor(y))
+svmfit <- svm(y~., data = dat
+              , kernel = "linear"
+              , cost = 10, scale = FALSE)
+plot(svmfit, dat)
+```
+
+The plot is horrible
+
+The output has some parameters
+
+```{r}
+svmfit$index
+summary(svmfit)
+```
+
+A smaller cost can be applied:
+
+```{r}
+dat = data.frame(x, y = as.factor(y))
+svmfit <- svm(y~., data = dat
+              , kernel = "linear"
+              , cost = 0.1, scale = FALSE)
+plot(svmfit, dat)
+
+svmfit$index
+summary(svmfit)
+```
+
+The tune function can be used to return cross validated models to pick the best params
+
+```{r}
+set.seed(1)
+tune.out=tune(svm, y∼., data=dat
+              , kernel="linear"
+              , ranges=list(
+                cost=c(0.001, 0.01
+                       , 0.1, 1,5
+                       ,10, 100)
+                )
+              )
+
+
+summary(tune.out)
+```
+
+tune stores the best model as follows:
+```{r}
+bestmod <- tune.out$best.model
+summary(bestmod)
+```
+
+Can use the model to predict
+```{r}
+xtest <- matrix(rnorm (20*2) , ncol=2)
+ytest <- sample(c(-1,1), 20, rep=TRUE)
+xtest[ytest==1,]= xtest[ytest==1,] + 1
+testdat <- data.frame(xtest, y=as.factor(ytest))
+```
+
+predict and create a conf mat
+
+```{r}
+ypred=predict(bestmod, testdat)
+table(predict = ypred, truth = testdat$y)
+```
+
+What does it look like with 0.01 as cost?
+
+```{r}
+svmfit <- svm(y~., data = dat
+              , kernel = "linear"
+              , cost = 0.01, scale = FALSE)
+plot(svmfit, dat)
+
+ypred=predict(svmfit, testdat)
+table(predict = ypred, truth = testdat$y)
+```
+
+Example where the classes are linearly separable:
+
+```{r}
+x[y==1,] <- x[y==1,]+0.5
+plot(x, col = y+3, pch = 19)
+dat <- data.frame(x, y = as.factor(y))
+```
+
+The classes are barely inseparable. Fitting with a very large value for cost ensures that none are misclassified.
+
+```{r}
+svmfit <- svm(y~., data = dat
+              , kernel = "linear"
+              , cost = 10e5, scale = FALSE)
+plot(svmfit, dat)
+summary(svmfit)
+```
+
+Non support vectors seen very close to decisions boundary. Suspect the model will perform poorly.
+
+```{r}
+svmfit <- svm(y~., data = dat
+              , kernel = "linear"
+              , cost = 1, scale = FALSE)
+plot(svmfit, dat)
+summary(svmfit)
+```
+
+Reducing cost to one misclassifies one point but uses 7 support vectors.
+
+## Support vector machine
+Set up some data with a nonlinear boundary
+
+```{r}
+set.seed(1)
+x <- matrix(rnorm (400), ncol=2)
+x[1:100,] <- x[1:100,]+2
+x[101:150,] <- x[101:150,]-2
+y <- c(rep(1,150),rep(2,50))
+dat <- data.frame(x,y=as.factor(y))
+plot(x, col = y, pch = 19)
+```
+
+Creating SVM with radial kernel
+
+```{r}
+train <- sample(200, 100)
+svmfit <- svm(y~., data = dat[train,]
+              , kernel = "radial"
+              , cost = 1, gamma = 1
+              , scale = FALSE)
+plot(svmfit, dat[train,])
+summary(svmfit)
+```
+
+There are a few training errors so we could reduce the cost but this comes at the price of a more irregular boundary which could be over fit.
+
+```{r}
+svmfit <- svm(y~., data = dat[train,]
+              , kernel = "radial"
+              , cost = 1e5, gamma = 1
+              , scale = FALSE)
+plot(svmfit, dat[train,])
+summary(svmfit)
+```
+
+Can use tune to cross validate for the best parameter settings:
+
+```{r}
+set.seed(1)
+tune.out <- tune(svm, y∼.
+                 , data = dat[train ,]
+                 , kernel="radial"
+                 , ranges=list(
+                   cost=c(0.1,1,10
+                          ,100,1000)
+                   , gamma=c(0.5,1
+                             ,2,3,4)
+                   )
+                 )
+summary(tune.out)
+```
+
+Using the best model, can predict on test data:
+
+```{r}
+confmat <- table(true=dat[-train ,"y"]
+      , pred=predict(tune.out$best.model
+                     , newx=dat[-train,]))
+confmat
+1 - (confmat[1,1]+confmat[2,2])/sum(confmat)
+```
+
