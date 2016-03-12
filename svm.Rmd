@@ -350,20 +350,21 @@ points(myGrid, pch = 1, col = sp2)
 ```{r}
 sep.plane3 <- function(x_1, x_2) {
   c <- (1 + x_1)^2 + (2 - x_2)^2
-  if (c == 4) return("black")
-  if (c > 4) return("pink")
-  if (c < 4) return("orange")
+  if (c == 5) return("black")
+  if (c > 5) return("pink")
+  if (c < 5) return("orange")
 }
 
-x1 <- seq(-5, 5, 1)
+x1 <- seq(-5, 40, 1)
 x2 <- x1
 myGrid <- expand.grid(x1 = x1, x2 = x2)
 
 sp3 <- mapply(sep.plane3, myGrid[,1], myGrid[,2])
-plot(myGrid, pch = 19, col = sp3, cex = 2)
+plot(myGrid, pch = 20, col = sp3, cex = 0.5)
 points(0,0, col = "red")
 points(-1,1, col = "red")
 points(2,2, col = "red")
+points(3,8, col = "red")
 ```
 
 ```{r}
@@ -475,3 +476,466 @@ test.error.lin.opt <- sum(1 * (y.pred == y.test))/length(y.test)
 test.error.lin.opt
 ```
 
+same with poly
+
+```{r}
+# find some polynomial svm by xval
+set.seed(12345)
+tune.out <- tune(svm, y∼.
+                 , data = x.train
+                 , kernel="polynomial"
+                 , ranges=list(
+                   cost = c(0.1, 0.5, 1)
+                 , gamma = c(0.1, 1)
+                   , degree = c(2,3,4)
+                   , coef0 = seq(-2, 2, 1)
+                   )
+                )
+summary(tune.out)
+```
+
+```{r}
+# optimised 
+svm.poly.opt <- svm(y~., data = x.train
+              , kernel = "polynomial"
+              , cost = 1
+              , gamma = 1
+              , degree = 2
+              , scale = FALSE)
+
+ygrid <- predict(svm.poly.opt,xgrid)
+plot(xgrid,col=as.character(ygrid),pch=20,cex=.2)
+
+# add all the points
+points(dt, col=y,pch=19)
+# mark the support vectors (from the training set)
+points(x.train[svm.poly.opt$index,],pch=5,cex=2)
+
+# opt test errors
+y.pred <- predict(svm.poly.opt, x.test)
+test.error.poly.opt <- sum(1 * (y.pred == y.test))/length(y.test)
+test.error.poly.opt
+```
+
+same with radial
+
+```{r}
+# find some radial svm by xval
+set.seed(12345)
+tune.out <- tune(svm, y∼.
+                 , data = x.train
+                 , kernel="radial"
+                 , ranges=list(
+                   cost = c(0.05, 0.1, 0.5, 1, 5, 10)
+                 , gamma = c(0.01, 0.1, 1, 10)
+                   )
+                )
+summary(tune.out)
+```
+
+```{r}
+# optimised 
+svm.rad.opt <- svm(y~., data = x.train
+              , kernel = "radial"
+              , cost = 5
+              , gamma = 1
+              , scale = FALSE)
+
+ygrid <- predict(svm.rad.opt,xgrid)
+plot(xgrid,col=as.character(ygrid),pch=20,cex=.2)
+
+# add all the points
+points(dt, col=y,pch=19)
+# mark the support vectors (from the training set)
+points(x.train[svm.rad.opt$index,],pch=5,cex=2)
+
+# opt test errors
+y.pred <- predict(svm.rad.opt, x.test)
+test.error.rad.opt <- sum(1 * (y.pred == y.test))/length(y.test)
+test.error.rad.opt
+```
+
+compare with logistic
+
+```{r}
+set.seed(12345)
+x1 <- runif(500) -0.5
+x2 <- runif(500) -0.5
+y <- 1 * (x1^2-x2^2 > 0)
+plot(x1, x2, col = factor(y))
+d <- data.frame(x1 = x1, x2, x2, y = factor(y))
+```
+
+```{r}
+logis.mod <- glm(y~x1+x2, d, family = binomial)
+probs <- predict(logis.mod, d, type = "response")
+preds <- rep(0, 500)
+preds[probs > 0.5] <- 1
+plot(x1, x2, col = factor(preds))
+
+logis.nl1.mod <- glm(y~x1*x2)
+probs <- predict(logis.nl1.mod, d, type = "response")
+preds <- rep(0, 500)
+preds[probs > 0.5] <- 1
+plot(x1, x2, col = factor(preds))
+
+logis.nl2.mod <- glm(y~poly(x1,2)+poly(x2,2))
+probs <- predict(logis.nl2.mod, d, type = "response")
+preds <- rep(0, 500)
+preds[probs > 0.5] <- 1
+plot(x1, x2, col = factor(preds))
+
+svm.lin.mod <- svm(y~x1+x2, d, kernel = "linear")
+preds <- predict(svm.lin.mod, d)
+plot(x1, x2, col =preds)
+
+svm.rad.mod <- svm(y~x1+x2, d, kernel = "radial")
+preds <- predict(svm.rad.mod, d)
+plot(x1, x2, col =preds)
+```
+
+# Q6
+
+set up data
+
+```{r}
+set.seed(12345)
+ns <- rnorm(200, sd = 2)
+x1 <- runif(200, 0, 10) + ns
+x2 <- runif(200, 0, 10) + ns
+y <- factor(0.5 + x1 - x2 > 0)
+d.train <- data.frame(x1 = x1, x2 = x2, y = y)
+plot(x1, x2, col = y, pch = 20)
+abline(0.5,1)
+```
+
+create sv classifier
+
+```{r}
+tune.svc <- tune(svm, y~., data = d
+                 , kernel = "linear"
+                 , ranges = list(cost = c(0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100)))
+
+summary(tune.svc)
+```
+
+generate some test data
+
+```{r}
+set.seed(123)
+ns <- rnorm(200, sd = 2)
+x1 <- runif(200, 0, 10) + ns
+x2 <- runif(200, 0, 10) + ns
+y <- factor(0.5 + x1 - x2 > 0)
+d.test <- data.frame(x1 = x1, x2 = x2, y = y)
+plot(x1, x2, col = y, pch = 20)
+abline(0.5,1)
+```
+
+compute test errors from the opt model
+```{r}
+svc <- svm(y~., d.train, kernel = "linear", cost = 10)
+preds <- predict(svc, d.test)
+
+table(preds, d.test$y)
+1 - sum(preds == d.test$y)/nrow(d.test)
+```
+
+```{r}
+svc <- svm(y~., d.train, kernel = "linear", cost = 1)
+preds <- predict(svc, d.test)
+
+table(preds, d.test$y)
+1 - sum(preds == d.test$y)/nrow(d.test)
+```
+
+```{r}
+svc <- svm(y~., d.train, kernel = "linear", cost = 0.1)
+preds <- predict(svc, d.test)
+
+table(preds, d.test$y)
+1 - sum(preds == d.test$y)/nrow(d.test)
+```
+
+```{r}
+svc <- svm(y~., d.train, kernel = "linear", cost = 0.01)
+preds <- predict(svc, d.test)
+
+table(preds, d.test$y)
+1 - sum(preds == d.test$y)/nrow(d.test)
+```
+
+```{r}
+svc <- svm(y~., d.train, kernel = "linear", cost = 100)
+preds <- predict(svc, d.test)
+
+table(preds, d.test$y)
+1 - sum(preds == d.test$y)/nrow(d.test)
+```
+
+# Q7
+
+```{r}
+library(ISLR)
+Auto$mpg01 <- factor(
+              ifelse(Auto$mpg > median(Auto$mpg)
+              , 1, 0))
+
+```
+
+classifier tuning
+
+```{r}
+set.seed(12345)
+tune.svc1 <- tune(svm, mpg01~., data = Auto
+                 , kernel = "linear"
+                 , ranges = list(cost = c(0.01, 0.05, 0.1, 0.5, 1, 5, 10, 50, 100, 1000)))
+
+summary(tune.svc1)
+```
+
+poly and rad
+
+```{r}
+set.seed(12345)
+tune.poly1 <- tune(svm, mpg01∼.
+                 , data = Auto
+                 , kernel="polynomial"
+                 , ranges=list(
+                   cost = c(0.1, 0.5, 1)
+                 , gamma = c(0.1, 1)
+                   , degree = c(2,3,4)
+                   , coef0 = seq(-2, 2, 1)
+                   )
+                )
+summary(tune.poly1)
+
+set.seed(12345)
+tune.rad1 <- tune(svm, mpg01∼.
+                 , data = Auto
+                 , kernel="radial"
+                 , ranges=list(
+                   cost = c(0.05, 0.1, 0.5, 1, 5, 10)
+                 , gamma = c(0.01, 0.1, 1, 10)
+                   )
+                )
+summary(tune.rad1)
+```
+
+```{r}
+list(
+svc1 = cbind(tune.svc1$best.performance, tune.svc1$best.parameters)
+
+, poly1 = cbind(tune.poly1$best.performance, tune.poly1$best.parameters)
+
+, rad1 = cbind(tune.rad1$best.performance, tune.rad1$best.parameters)
+)
+
+```
+
+create best in class models
+
+```{r}
+auto.svc <- svm(mpg01~., data = Auto, kernel = "linear", cost = 1)
+
+auto.poly <- svm(mpg01~., data = Auto, kernel = "polynomial", cost = 1, gamma = 0.1
+                 , degree = 2, coef0 = 2)
+
+auto.rad <- svm(mpg01~., data = Auto, kernel = "radial", cost = 10, gamma = 0.01)
+```
+
+some plots
+
+```{r}
+plot(auto.svc, Auto, mpg~cylinders)
+plot(auto.svc, Auto, mpg~displacement)
+plot(auto.svc, Auto, mpg~horsepower)
+plot(auto.svc, Auto, mpg~weight)
+plot(auto.svc, Auto, mpg~acceleration)
+plot(auto.svc, Auto, mpg~year)
+plot(auto.svc, Auto, mpg~origin)
+
+plot(auto.poly, Auto, mpg~cylinders)
+plot(auto.poly, Auto, mpg~displacement)
+plot(auto.poly, Auto, mpg~horsepower)
+plot(auto.poly, Auto, mpg~weight)
+plot(auto.poly, Auto, mpg~acceleration)
+plot(auto.poly, Auto, mpg~year)
+plot(auto.poly, Auto, mpg~origin)
+
+plot(auto.rad, Auto, mpg~cylinders)
+plot(auto.rad, Auto, mpg~displacement)
+plot(auto.rad, Auto, mpg~horsepower)
+plot(auto.rad, Auto, mpg~weight)
+plot(auto.rad, Auto, mpg~acceleration)
+plot(auto.rad, Auto, mpg~year)
+plot(auto.rad, Auto, mpg~origin)
+```
+
+# Q8
+
+```{r}
+set.seed(1)
+train <- sample(nrow(OJ), 800)
+OJ.train <- OJ[train, ]
+OJ.test <- OJ[-train, ]
+
+svm.linear <- svm(Purchase ~ ., data = OJ.train, kernel = "linear", cost = 0.01)
+summary(svm.linear)
+
+train.pred <- predict(svm.linear, OJ.train)
+table(train.pred, OJ.train$Purchase)
+train.error <- 1 - sum(train.pred == OJ.train$Purchase)/length(train.pred)
+train.error
+
+test.pred <- predict(svm.linear, OJ.test)
+table(test.pred, OJ.test$Purchase)
+test.error <- 1 - sum(test.pred == OJ.test$Purchase)/length(test.pred)
+test.error
+
+set.seed(2)
+tune.out <- tune(svm, Purchase ~ ., data = OJ.train, kernel = "linear", ranges = list(cost = 10^seq(-2, 1, by = 0.25)))
+summary(tune.out)
+
+svm.linear <- svm(Purchase ~ ., data = OJ.train, kernel = "linear", cost = 0.1)
+summary(svm.linear)
+
+train.pred <- predict(svm.linear, OJ.train)
+table(train.pred, OJ.train$Purchase)
+train.error <- 1 - sum(train.pred == OJ.train$Purchase)/length(train.pred)
+train.error
+
+test.pred <- predict(svm.linear, OJ.test)
+table(test.pred, OJ.test$Purchase)
+test.error <- 1 - sum(test.pred == OJ.test$Purchase)/length(test.pred)
+test.error
+```
+
+repeat with poly
+
+```{r}
+svm.polynomial <- svm(Purchase ~ ., data = OJ.train, kernel = "polynomial", degree = 2)
+summary(svm.polynomial)
+
+train.pred <- predict(svm.polynomial, OJ.train)
+table(train.pred, OJ.train$Purchase)
+train.error <- 1 - sum(train.pred == OJ.train$Purchase)/length(train.pred)
+train.error
+
+test.pred <- predict(svm.polynomial, OJ.test)
+table(test.pred, OJ.test$Purchase)
+test.error <- 1 - sum(test.pred == OJ.test$Purchase)/length(test.pred)
+test.error
+
+set.seed(2)
+tune.out <- tune(svm, Purchase ~ ., data = OJ.train, kernel = "polynomial", degree = 2, ranges = list(
+  cost = 10^seq(-2, 1, by = 0.25)
+  , gamma = c(0.1, 1)))
+summary(tune.out)
+
+svm.polynomial <- svm(Purchase ~ ., data = OJ.train, kernel = "polynomial", degree= 2, cost = 3.162278, gamma = 1)
+summary(svm.polynomial)
+
+train.pred <- predict(svm.polynomial, OJ.train)
+table(train.pred, OJ.train$Purchase)
+train.error <- 1 - sum(train.pred == OJ.train$Purchase)/length(train.pred)
+train.error
+
+test.pred <- predict(svm.polynomial, OJ.test)
+table(test.pred, OJ.test$Purchase)
+test.error <- 1 - sum(test.pred == OJ.test$Purchase)/length(test.pred)
+test.error
+```
+
+repeat with rad
+
+```{r}
+svm.radial <- svm(Purchase ~ ., data = OJ.train, kernel = "radial")
+summary(svm.radial)
+
+train.pred <- predict(svm.radial, OJ.train)
+table(train.pred, OJ.train$Purchase)
+train.error <- 1 - sum(train.pred == OJ.train$Purchase)/length(train.pred)
+train.error
+
+test.pred <- predict(svm.radial, OJ.test)
+table(test.pred, OJ.test$Purchase)
+test.error <- 1 - sum(test.pred == OJ.test$Purchase)/length(test.pred)
+test.error
+
+set.seed(2)
+tune.out <- tune(svm, Purchase ~ ., data = OJ.train, kernel = "radial", degree = 2, ranges = list(
+  cost = 10^seq(-2, 1, by = 1)
+  , gamma = c(0.01, 0.1, 1, 10)))
+summary(tune.out)
+
+svm.radial <- svm(Purchase ~ ., data = OJ.train, kernel = "radial", cost = 1, gamma = 0.1)
+summary(svm.radial)
+
+train.pred <- predict(svm.radial, OJ.train)
+table(train.pred, OJ.train$Purchase)
+train.error <- 1 - sum(train.pred == OJ.train$Purchase)/length(train.pred)
+train.error
+
+test.pred <- predict(svm.radial, OJ.test)
+table(test.pred, OJ.test$Purchase)
+test.error <- 1 - sum(test.pred == OJ.test$Purchase)/length(test.pred)
+test.error
+```
+
+# lab 9
+
+```{r}
+set.seed(12345)
+reps <- 20
+test.error.rad <- rep(NA, reps)
+test.error.lin <- rep(NA, reps)
+test.error.glm <- rep(NA, reps)
+for (i in 1:reps) {
+  gen <- rnorm(1000)
+  separator <- sample(100, 50)
+  x.train <- matrix(gen, nrow = 100, ncol = 10)
+  x.train[separator, 1:5] <- x.train[separator, 1:5] + 1
+  
+  y.train <- rep(0, 100)
+  y.train[separator] <- 1
+  
+  d.train <- data.frame(cbind(y = y.train, x.train))
+  d.train$y <- factor(d.train$y)
+  
+  gen <- rnorm(5000)
+  separator <- sample(500, 250)
+  x.test <- matrix(gen, nrow = 500, ncol = 10)
+  x.test[separator, 1:5] <- x.test[separator, 1:5] + 1
+  
+  y.test <- rep(0, 500)
+  y.test[separator] <- 1
+  
+  d.test <- data.frame(cbind(y =y.test, x.test))
+  d.test$y <- factor(d.test$y)
+  
+  lab.rad <- svm(y~., data = d.train, kernel = "radial")
+  
+  preds <- predict(lab.rad, d.test)
+  test.error.rad[i] <- 1 - sum(preds == y.test)/length(y.test)
+
+  lab.lin <- svm(y~., data = d.train, kernel = "linear")
+  
+  preds <- predict(lab.lin, d.test)
+  test.error.lin[i] <- 1 - sum(preds == y.test)/length(y.test)
+  
+  lab.glm <- glm(y~., data = d.train, family = binomial)
+  preds <- ifelse(predict(lab.glm, d.test, type = "response") > 0.5, 1, 0)
+  
+  test.error.glm[i] <- 1 - sum(preds == y.test)/length(y.test)
+
+}
+test.error.rad
+mean(test.error.rad)
+
+test.error.lin
+mean(test.error.lin)
+
+test.error.glm
+mean(test.error.glm)
+```

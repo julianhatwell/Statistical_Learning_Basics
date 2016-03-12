@@ -10,10 +10,10 @@ apply(USArrests,2, var)
 We see that `Assault` has a much larger variance than the other variables. It would dominate the principal components, so we choose to standardize the variables when we perform PCA
 
 ```{r}
-pca.out=prcomp(USArrests, scale=TRUE)
+pca.out <- prcomp(USArrests, scale=TRUE)
 pca.out
 names(pca.out)
-biplot(pca.out, scale=0)
+biplot(pca.out, scale=0, cex = 0.6)
 ```
 
 K-Means Clustering
@@ -49,7 +49,6 @@ hc.single=hclust(dist(x),method="single")
 plot(hc.single)
 hc.average=hclust(dist(x),method="average")
 plot(hc.average)
-
 ```
 Lets compare this with the actualy clusters in the data. We will use the function `cutree` to cut the tree at level 4.
 This will produce a vector of numbers from 1 to 4, saying which branch each observation is on. You will sometimes see pretty plots where the leaves of the dendrogram are colored. I searched a bit on the web for how to do this, and its a little too complicated for this demonstration.
