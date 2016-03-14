@@ -149,23 +149,6 @@ abline(h = min(test.err), col = "red")
 
 We can see this did better than the randfor
 
-Calcultating Gini index
-
-$$G = \sum_{k=1}^K{\hat p_{mk}}(1-{\hat p_{mk}})$$
-
-```{r gini}
-# for every class K, sum of proportion K in region * proportion not K in region
-
-# proportions will always add to 1
-
-p <- c(0.2, 0.8)
-
-v <- p * (1-p)
-
-sum(v)
-
-```
-
 # Lab Regresion Trees
 
 ```{r}
@@ -339,6 +322,17 @@ mean((yhat.boost-boston.test)^2)
 
 # Exercises
 ## Question 2 - Comparing deviance, gini and cross entropy
+
+Calcultating Gini index, cross entropy and classification error rate.
+
+$$G = \sum_{k=1}^K{\hat p_{mk}}(1-{\hat p_{mk}})$$
+
+
+$$D = \sum_{k=1}^K{\hat p_{mk}}{\log {\hat p_{mk}}}$$
+
+
+$$E = 1 - \max_k({\hat p_{mk}})$$
+
 ```{r}
 gini <- function(p) {
   v <- p * (1-p)
@@ -366,8 +360,6 @@ impurity.measures[,3] <- apply(p, 1, cross.entropy)
 
 matplot(p[,1], impurity.measures, type = "l")
 ```
-
-
 
 ```{r, eval=FALSE}
 # this takes a really long time
