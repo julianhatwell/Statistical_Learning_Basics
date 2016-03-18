@@ -3,13 +3,17 @@ Non-linear Models
 
 ```{r}
 require(ISLR)
-attach(Wage)
+require(lattice)
+require(gam)
+library(MASS)
+library(leaps)
 ```
 
 Polynomials
 -----------
 Single variable: age
 ```{r}
+attach(Wage)
 fit <- lm(wage~poly(age,4), data = Wage)
 summary(fit)
 ```
@@ -40,11 +44,11 @@ ANOVA to determine polynomial degree
 Using a hypothesis test to determine the degree of polynomial to use.
 
 ```{r}
-fit.1=lm(wage∼age,data=Wage)
-fit.2=lm(wage∼poly(age,2),data=Wage)
-fit.3=lm(wage∼poly(age,3),data=Wage)
-fit.4=lm(wage∼poly(age,4),data=Wage)
-fit.5=lm(wage∼poly(age,5),data=Wage)
+fit.1=lm(wage~age,data=Wage)
+fit.2=lm(wage~poly(age,2),data=Wage)
+fit.3=lm(wage~poly(age,3),data=Wage)
+fit.4=lm(wage~poly(age,4),data=Wage)
+fit.5=lm(wage~poly(age,5),data=Wage)
 anova(fit.1,fit.2,fit.3,fit.4,fit.5)
 ```
 
@@ -92,5 +96,567 @@ Or can tell it to use cross validation to choose df automatically
 fit <- smooth.spline(age, wage, cv = TRUE)
 lines(fit, col = "purple", lwd = 2)
 fit
+```
+
+A simple basis function
+
+```{r}
+# ISLR 7
+# Question 3
+b2 <- function(X) {
+  X <- if (X >= 1) { (X - 1)^2 } else { 0 }
+  X
+}
+x <- seq(-2,2,0.01)
+y <- 1 + x - 2 * sapply(x, b2)
+plot(x,y, type = "l")
+
+# ppaguay solution
+x = -2:2
+y = 1 + x + -2 * (x-1)^2 * I(x>1)
+plot(x, y, type = "l")
+```
+
+```{r}
+# Question 4 - another basis function
+b1 <- function(X) {
+  I(0 <= X & X <= 2) - (X - 1) * I(1 <= X & X <= 2)
+}
+b2 <- function(X) {
+  (X - 3) * I(3 <= X & X <= 4) + I(4 <= X & X <= 5)
+}
+y <- 1 + 1 * sapply(x, b1) + 3 * sapply(x, b2)
+plot(x,y, type = "l")
+```
+
+```{r}
+# Question 6
+# polynomial
+# set up manual cv
+k <- 5
+pn <- 10
+val.errors <- matrix(nrow = k, ncol = pn)
+folds <- integer(0)
+# method to get close to equal size folds
+set.seed(1221)
+while (length(folds) < nrow(Wage)) {
+  folds <- c(folds, sample(1:k, replace = FALSE))
+}
+folds <- folds[1:nrow(Wage)]
+
+for (i in 1:k) {
+  Wage.train <- Wage[folds != i,]
+  Wage.test <- Wage[folds == i,]
+  
+  for(j in 1:pn) {
+    fit.poly <- lm(wage~poly(age,j), data = Wage.train)
+    pred.poly <- predict(fit.poly, Wage.test)
+    val.errors[i,j] <- mean((pred.poly - Wage.test$wage)^2)
+  }
+}
+
+cv.errors <- apply(val.errors, 2, mean)
+which.min(cv.errors)
+plot(cv.errors, xlab = "Degree", ylab = "Test MSE", type = "l")
+points(which.min(cv.errors), cv.errors[which.min(cv.errors)], col = "red", cex = 2, pch = 20)
+
+# ppaquay solution
+library(boot) # contains cv.glm for doing K-Fold on a glm
+set.seed(110)
+deltas <- rep(NA, pn)
+
+for (j in 1:pn) {
+  fit <- glm(wage ~ poly(age, j), data = Wage)
+  deltas[j] <- cv.glm(Wage, fit, K = k)$delta[2]
+}
+plot(deltas, xlab = "Degree", ylab = "Test MSE", type = "l")
+points(which.min(deltas), deltas[which.min(deltas)], col = "red", cex = 2, pch = 20)
+
+# set up anova
+fit.1=lm(wage~age,data=Wage)
+fit.2=lm(wage~poly(age,2),data=Wage)
+fit.3=lm(wage~poly(age,3),data=Wage)
+fit.4=lm(wage~poly(age,4),data=Wage)
+fit.5=lm(wage~poly(age,5),data=Wage)
+fit.6=lm(wage~poly(age,6),data=Wage)
+fit.7=lm(wage~poly(age,7),data=Wage)
+fit.8=lm(wage~poly(age,8),data=Wage)
+fit.9=lm(wage~poly(age,9),data=Wage)
+fit.10=lm(wage~poly(age,10),data=Wage)
+anova(fit.1,fit.2,fit.3,fit.4,fit.5,fit.6,fit.7,fit.8,fit.9,fit.10)
+summary(fit.10)
+
+# make a plot
+attach(Wage)
+age.lims <- range(age)
+age.grid <- seq(from = age.lims[1], to = age.lims[2])
+preds <- predict(fit.4, newdata = data.frame(age = age.grid), se = TRUE)
+se.bands <- cbind(preds$fit - preds$se.fit * 1.96
+                  , preds$fit + preds$se.fit * 1.96)
+plot(wage~age, col = "darkgrey")
+lines(age.grid, preds$fit, lwd=2, col = "blue")
+matlines(age.grid, se.bands, lty = 2, col = "blue")
+
+# step function
+# use manual cv set up from poly section
+k <- 5
+pn <- 10
+val.errors <- matrix(nrow = k, ncol = pn)
+
+for(j in 2:pn) {
+  Wage$age.step <- cut(Wage$age, j)
+  for (i in 1:k) {
+    Wage.train <- Wage[folds != i,]
+    Wage.test <- Wage[folds == i,]
+    fit.step <- lm(wage~age.step, data = Wage.train)
+    pred.step <- predict(fit.step, Wage.test)
+    val.errors[i,j] <- mean((pred.step - Wage.test$wage)^2)
+  }
+}
+
+cv.errors <- apply(val.errors, 2, mean)
+which.min(cv.errors)
+plot(2:pn, cv.errors[2:pn], xlab = "Cuts", ylab = "Test MSE", type = "l")
+points(which.min(cv.errors[2:pn]) + 1, cv.errors[which.min(cv.errors)], col = "red", cex = 2, pch = 20)
+
+# ppaquay solution
+set.seed(12)
+cvs <- rep(NA, pn)
+for (j in 2:pn) {
+  Wage$age.cut <- cut(Wage$age, j)
+  fit <- glm(wage ~ age.cut, data = Wage)
+  cvs[j] <- cv.glm(Wage, fit, K = 10)$delta[2]
+}
+plot(2:10, cvs[-1], xlab = "Cuts", ylab = "Test MSE", type = "l")
+d.min <- which.min(cvs)
+points(which.min(cvs), cvs[which.min(cvs)], col = "red", cex = 2, pch = 20)
+
+# create a plot
+fit.step <- lm(wage~cut(age, which.min(cv.errors)), data = Wage)
+preds <- predict(fit.step, newdata = data.frame(age = age.grid), se = TRUE)
+se.bands <- cbind(preds$fit - preds$se.fit * 1.96
+                  , preds$fit + preds$se.fit * 1.96)
+plot(wage~age, col = "darkgrey")
+lines(age.grid, preds$fit, lwd=2, col = "blue")
+matlines(age.grid, se.bands, lty = 2, col = "blue")
+```
+
+```{r}
+# Question 7
+bwplot(wage~factor(year), Wage, groups = year,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 4))
+
+bwplot(wage~maritl, Wage, groups = maritl,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 4))
+
+bwplot(wage~race, Wage, groups = race,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 4))
+
+bwplot(wage~education, Wage, groups = education,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 4))
+
+bwplot(wage~jobclass, Wage, groups = jobclass,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 4))
+
+bwplot(wage~health, Wage, groups = health,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 2))
+
+bwplot(wage~health_ins, Wage, groups = health_ins,
+       panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.stripplot(x, y, ..., jitter.data = TRUE,
+                         groups = groups, subscripts = subscripts)
+         panel.average(x[y < 250], y[y < 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x[y >= 250], y[y >= 250], subscripts, fun = mean
+                       , col = "black", lwd = 0.1, ...)
+         panel.average(x, y, subscripts, fun = mean
+                       , col = "black", lwd = 2, ...)
+       },
+       auto.key =
+         list(points = TRUE, lines = FALSE, columns = 2))
+
+# step function for year
+# use manual cv set up from poly section
+k <- 5
+val.errors <- rep(NA, 5)
+coef.scores <- matrix(NA, nrow = 5, ncol = 7)
+
+for (i in 1:k) {
+  Wage.train <- Wage[folds != i,]
+  Wage.test <- Wage[folds == i,]
+  fit.step <- lm(wage~factor(year), data = Wage.train)
+  pred.step <- predict(fit.step, Wage.test)
+  val.errors[i] <- mean((pred.step - Wage.test$wage)^2)
+  coef.scores[i,] <- coef(fit.step)
+  print(coef(fit.step))
+}
+
+best.coef <- coef.scores[which.min(val.errors),]
+best.coef
+
+# create a step function from these:
+years <- c(2003, 2004, 2005, 2006, 2007, 2008, 2009)
+step.func.year <- function(yr) {
+  keyVals <- data.frame(year = years
+                      , constant = c(best.coef[1]
+                      , best.coef[1] + best.coef[2]
+                      , best.coef[1] + best.coef[3]
+                      , best.coef[1] + best.coef[4]
+                      , best.coef[1] + best.coef[5]
+                      , best.coef[1] + best.coef[6]
+                      , best.coef[1] + best.coef[7]))
+  return(keyVals[keyVals$year == yr, "constant"])
+}
+preds <- sapply(Wage$year, step.func.year)
+error <- mean((Wage$wage - preds)^2)
+error ; val.errors[which.min(val.errors)]
+# this didn't do so well as the test estimate
+preds <- sapply(years, step.func.year)
+plot(Wage$year, Wage$wage, col = "lightgrey")
+lines(years, preds, col = "blue")
+# it looks just like the panel average function
+
+# local regression
+year.lo <- loess(wage~year, data = Wage, span = 2)
+plot(Wage$year, Wage$wage, col = "lightgrey")
+lines(years, predict(year.lo, years))
+
+# gam
+gam1 <- gam(wage~lo(year, span = 2), data = Wage)
+gam2 <- gam(wage~lo(year, span = 2) + s(age, 4), data = Wage)
+gam3 <- gam(wage~lo(year, span = 2) + s(age, 4) + maritl, data = Wage)
+gam4 <- gam(wage~lo(year, span = 2) + s(age, 4) + maritl + education, data = Wage)
+gam5 <- gam(wage~lo(year, span = 2) + s(age, 4) + maritl + education + health_ins, data = Wage)
+gam6 <- gam(wage~lo(year, span = 2) + s(age, 4) + maritl + education + health_ins + health, data = Wage)
+gam7 <- gam(wage~lo(year, span = 2) + s(age, 4) + maritl + education + health_ins + health + jobclass, data = Wage)
+gam8 <- gam(wage~lo(year, span = 2) + s(age, 4) + maritl + education + health_ins + health + jobclass + race, data = Wage)
+anova(gam1, gam2, gam3, gam4, gam5, gam6, gam7, gam8)
+
+# bit of trial and error but looks like gam7 is the one
+oldpar <- par()
+par(mfrow = c(2,4))
+plot(gam7)
+par(oldpar)
+```
+
+```{r}
+# question 8
+# Auto, evidence of non-lin in the weight/disp/hp vs mpg (the three are highly correl)
+# also accel vs mpg
+attach(Auto)
+plot(weight, mpg, col = "lightgrey")
+
+# polynom?
+library(boot) # contains cv.glm for doing K-Fold on a glm
+k <- 5
+pn <- 10
+deltas <- rep(NA, pn)
+
+for (j in 1:pn) {
+  set.seed(12)
+  fit <- glm(mpg ~ poly(weight, j), data = Auto)
+  deltas[j] <- cv.glm(Auto, fit, K = k)$delta[2]
+}
+best.poly <- which.min(deltas)
+plot(deltas, xlab = "Degree", ylab = "Test MSE", type = "l")
+points(best.poly, deltas[best.poly], col = "red", cex = 2, pch = 20)
+
+# set up for function plots
+weight.lims <- range(weight)
+weight.grid <- seq(weight.lims[1], weight.lims[2], 1) 
+
+lm.poly <- lm(mpg~poly(weight, best.poly))
+pred.poly <- predict(lm.poly, data.frame(weight = weight.grid), se.fit = TRUE)
+se.bands <- cbind(pred.poly$fit - pred.poly$se.fit * 1.96
+                  , pred.poly$fit + pred.poly$se.fit * 1.96)
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.poly$fit, col = "blue", lwd = 2)
+matlines(weight.grid, se.bands, col = "blue", lty = 2)
+
+# smooth spline
+gam.spline <- gam(mpg~s(weight,best.poly))
+pred.gam.spline <- predict(gam.spline, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.gam.spline, col = "blue", lwd = 2)
+
+# loess
+gam.loess <- gam(mpg~lo(weight,2))
+pred.gam.loess <- predict(gam.loess, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.gam.loess, col = "blue", lwd = 2)
+
+# inverse relationship
+gam.inv <- gam(mpg~I(1/weight))
+pred.gam.inv <- predict(gam.inv, data.frame(weight = weight.grid))
+
+plot(weight, mpg, col = "lightgrey")
+lines(weight.grid, pred.gam.inv, col = "blue", lwd = 2)
+
+# acceleration
+for (j in 1:pn) {
+  set.seed(12)
+  fit <- glm(mpg ~ poly(acceleration, j), data = Auto)
+  deltas[j] <- cv.glm(Auto, fit, K = k)$delta[2]
+}
+
+best.poly <- which.min(deltas)
+plot(deltas, xlab = "Degree", ylab = "Test MSE", type = "l")
+points(best.poly, deltas[best.poly], col = "red", cex = 2, pch = 20)
+
+# set up for function plots
+acceleration.lims <- range(acceleration)
+acceleration.grid <- seq(acceleration.lims[1], acceleration.lims[2], 0.1) 
+
+lm.poly <- lm(mpg~poly(acceleration, best.poly))
+pred.poly <- predict(lm.poly, data.frame(acceleration = acceleration.grid), se.fit = TRUE)
+se.bands <- cbind(pred.poly$fit - pred.poly$se.fit * 1.96
+                  , pred.poly$fit + pred.poly$se.fit * 1.96)
+
+plot(acceleration, mpg, col = "lightgrey")
+lines(acceleration.grid, pred.poly$fit, col = "blue", lwd = 2)
+matlines(acceleration.grid, se.bands, col = "blue", lty = 2)
+
+# smooth spline
+gam.spline <- gam(mpg~s(acceleration,best.poly))
+pred.gam.spline <- predict(gam.spline, data.frame(acceleration = acceleration.grid))
+
+plot(acceleration, mpg, col = "lightgrey")
+lines(acceleration.grid, pred.gam.spline, col = "blue", lwd = 2)
+
+# loess
+gam.loess <- gam(mpg~lo(acceleration,2))
+pred.gam.loess <- predict(gam.loess, data.frame(acceleration = acceleration.grid))
+
+plot(acceleration, mpg, col = "lightgrey")
+lines(acceleration.grid, pred.gam.loess, col = "blue", lwd = 2)
+
+# step func at year
+year.grid <- factor(unique(Auto$year))
+Auto$year_f <- factor(Auto$year)
+gam.step <- gam(mpg~year_f, data = Auto)
+pred.gam.step <- predict(gam.step, data.frame(year_f = year.grid), se.fit = TRUE)
+se.bands <- cbind(pred.gam.step$fit - pred.gam.step$se.fit * 1.96
+                  , pred.gam.step$fit + pred.gam.step$se.fit * 1.96)
+
+
+plot(Auto$year_f, Auto$mpg, col = "lightgrey")
+lines(year.grid, pred.gam.step$fit, col = "blue", lwd = 2)
+matlines(as.numeric(year.grid), se.bands, col = "blue", lty = 2)
+```
+
+```{r}
+# question 9
+attach(Boston)
+plot(nox, dis, col = "lightgrey")
+
+glm.cubic <- glm(dis~poly(nox,3), data = Boston)
+summary(glm.cubic)
+nox.lims <- range(nox)
+nox.lims
+nox.grid <- seq(nox.lims[1], nox.lims[2], 0.01)
+pred.glm.cubic <- predict(glm.cubic, data.frame(nox = nox.grid))
+lines(nox.grid, pred.glm.cubic, col = "blue", lwd = 2)
+
+pn <- 10
+val.errors <- rep(NA,10)
+for (j in 1:pn) {
+  set.seed(1)
+  glm.cubic <- glm(dis~poly(nox,j), data = Boston)
+  val.errors[j] <- cv.glm(Boston, glm.cubic, K = 5)$delta[2]
+}
+best.poly <- which.min(val.errors)
+plot(val.errors, xlab = "Degree", ylab = "CV MSE", type = "l")
+points(best.poly, val.errors[best.poly], col = "red", cex = 2, pch = 20)
+
+# rspline
+glm.rspline <- glm(dis~bs(nox,4), data = Boston)
+summary(glm.rspline)
+attr(bs(nox,4), "knots")
+
+pred.glm.rspline <- predict(glm.rspline, data.frame(nox = nox.grid))
+plot(nox, dis, col = "lightgrey")
+lines(nox.grid, pred.glm.cubic, col = "blue", lwd = 2)
+lines(nox.grid, pred.glm.rspline, col = "red", lwd = 2)
+
+val.errors <- rep(NA,10)
+for (j in 1:pn) {
+  glm.rspline <- glm(dis~bs(nox,j), data = Boston)
+  val.errors[j] <- cv.glm(Boston, glm.cubic, K = 5)$delta[2]
+}
+best.rspline <- which.min(val.errors)
+plot(val.errors, xlab = "Degree", ylab = "CV MSE", type = "l")
+points(best.rspline, val.errors[best.rspline], col = "red", cex = 2, pch = 20)
+
+glm.cubic <- glm(dis~poly(nox,3), data = Boston)
+glm.best.poly <- glm(dis~poly(nox,best.poly), data = Boston)
+glm.rspline <- glm(dis~bs(nox,best.rspline), data = Boston)
+pred.glm.cubic <- predict(glm.cubic, data.frame(nox = nox.grid))
+pred.glm.best.poly <- predict(glm.best.poly, data.frame(nox = nox.grid))
+pred.glm.rspline <- predict(glm.rspline, data.frame(nox = nox.grid))
+
+plot(nox, dis, col = "lightgrey")
+lines(nox.grid, pred.glm.cubic, col = "blue", lwd = 4)
+lines(nox.grid, pred.glm.best.poly, col = "green", lwd = 2)
+lines(nox.grid, pred.glm.rspline, col = "red", lwd = 2)
+```
+
+```{r}
+# question 10
+set.seed(123)
+train <- sample(c(TRUE, FALSE), dim(College)[1], replace = TRUE, prob = c(0.9, 0.1))
+College.train <- College[train,]
+College.test <- College[!train,]
+College.fwd <- regsubsets(Outstate~., data = College, method = "forward", nvmax = 17)
+sum.College.fwd <- summary(College.fwd)
+
+plot(sum.College.fwd$adjr2)
+plot(sum.College.fwd$bic)
+plot(sum.College.fwd$cp)
+
+par(mfrow = c(1, 3))
+plot(sum.College.fwd$cp, xlab = "Number of variables", ylab = "Cp", type = "l")
+min.cp <- min(sum.College.fwd$cp)
+std.cp <- sd(sum.College.fwd$cp)/sqrt(length(sum.College.fwd$cp))
+abline(h = min.cp + std.cp, col = "red", lty = 2)
+abline(h = min.cp - std.cp, col = "red", lty = 2)
+plot(sum.College.fwd$bic, xlab = "Number of variables", ylab = "BIC", type='l')
+min.bic <- min(sum.College.fwd$bic)
+std.bic <- sd(sum.College.fwd$bic)/sqrt(length(sum.College.fwd$bic))
+abline(h = min.bic + std.bic, col = "red", lty = 2)
+abline(h = min.bic - std.bic, col = "red", lty = 2)
+plot(sum.College.fwd$adjr2, xlab = "Number of variables", ylab = "Adjusted R2", type = "l", ylim = c(0.4, 0.84))
+max.adjr2 <- max(sum.College.fwd$adjr2)
+std.adjr2 <- sd(sum.College.fwd$adjr2)/sqrt(length(sum.College.fwd$adjr2))
+abline(h = max.adjr2 + std.adjr2, col = "red", lty = 2)
+abline(h = max.adjr2 - std.adjr2, col = "red", lty = 2)
+
+# 6 components looks like the best
+coef(College.fwd, 6)
+par(mfrow =c(1,1))
+boxplot(Outstate~Private, data = College)
+xyplot(Outstate~Room.Board, data = College)
+xyplot(Outstate~PhD, data = College)
+xyplot(Outstate~perc.alumni, data = College)
+xyplot(Outstate~Expend, data = College)
+xyplot(Outstate~Grad.Rate, data = College)
+
+gam.basic <- gam(Outstate~Private+Room.Board+PhD+perc.alumni+Expend+Grad.Rate
+                 , data = College)
+
+preds.gam.basic <- predict(gam.basic, College.test)
+RSS <- mean((preds.gam.basic - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.basic)
+
+gam.E <- gam(Outstate~Private+Room.Board+PhD+perc.alumni+s(Expend, 3)+Grad.Rate
+                 , data = College)
+preds.gam.E <- predict(gam.E, College.test)
+RSS <- mean((preds.gam.E - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.E)
+
+gam.E5 <- gam(Outstate~Private+Room.Board+PhD+perc.alumni+s(Expend, 5)+Grad.Rate
+             , data = College)
+preds.gam.E5 <- predict(gam.E5, College.test)
+RSS <- mean((preds.gam.E5 - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.E5)
+# 5th df is not better than 3rd
+
+gam.mult <- gam(Outstate~Private+s(Room.Board,2)+s(PhD,2)+s(perc.alumni,2)+s(Expend, 3)+s(Grad.Rate,2)
+             , data = College)
+preds.gam.mult <- predict(gam.mult, College.test)
+RSS <- mean((preds.gam.mult - College.test$Outstate)^2)
+TSS <- mean((College.test$Outstate - mean(College.test$Outstate))^2)
+R2 <- 1 - RSS/TSS
+R2
+summary(gam.mult)
+# only expend is significant in nonlinear
+oldpar <- par()
+par(mfrow = c(2,3))
+plot(gam.E)
+par(oldpar)
 ```
 
