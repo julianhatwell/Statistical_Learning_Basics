@@ -21,9 +21,13 @@ dt <- setData(Auto1, "mpg")
 ptype <- if (is.numeric(dt$dt.frm[[dt$resp]])) { "regression" } else { "classification"}
 
 # use the EDA file to explore the data
-# do anything you can to the wholesale data set before partitioning
-# pick apporpriate funcs from the various checks file
+# pick appropriate funcs from the various checks file
+# check for NA vals
+na.vals.check(dt)
+# and near zero variance
+nzv.check(dt) 
 
+# do anything you can to the wholesale data set before partitioning
 # such as removing entire columns
 # creating dummy variables out of factors if required
 dt$dt.frm <- createDummies(dt$dt.frm, dt$resp)
