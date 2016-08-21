@@ -1,3 +1,4 @@
+library(ElemStatLearn)
 set.seed(105)
 ll <- matrix(NA,nrow=100,ncol=155)
 for(i in 1:100){
