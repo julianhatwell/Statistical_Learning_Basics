@@ -1,4 +1,3 @@
-rm(list = ls())
 library(neuralnet)
 library(nnet)
 library(NeuralNetTools)
@@ -7,35 +6,6 @@ library(ISLR)
 library(caTools) # split.sample
 library(boot) # cv.glm
 library(plyr) # for a progress bar
-
-# ----- Utility Funcs -----
-# neuralnet library needs specific setup
-neuralnet.fmla <- function(resp, dt) {
-  r <- resp
-  n <- names(dt)
-  f <- as.formula(paste(r, "~", paste(n[!n %in% r], collapse = " + ")))
-  f
-}
-
-
-MSE <- function(pred, act) {
-  sum((pred - act)^2)/length(pred)
-} # mean squared error
-
-MAD <- function(pred, act) {
-  median(abs(pred - act))
-} # absolute median deviation
-
-RMSE <- function(pred, act) {
-  sqrt(sum((pred - act)^2)/length(pred))
-} # route mean squared error
-
-reg.measures <- function(pred, act) {
-  MSE.measure <- MSE(pred, act)
-  RMSE.measure <- RMSE(pred, act)
-  MAD.measure <- MAD(pred, act)
-  data.frame(MSE.measure, RMSE.measure, MAD.measure)
-}
 
 # ----- Boston Housing Example -----
 # Check that no data is missing
@@ -59,7 +29,8 @@ Boston.glm.preds <- predict(Boston.glm
                             , newdata = Boston.test)
 
 # Test Accuracy Measures
-reg.measures(Boston.glm.preds, Boston.test$medv)
+Boston.glm.rm <- reg.measures(Boston.glm.preds, Boston.test$medv)
+Boston.glm.rm
 
 # Neural net fitting
 # Scaling data for the NN
@@ -75,6 +46,7 @@ Boston.train.scaled <- Boston.scaled[Boston.split, ]
 Boston.test.scaled <- Boston.scaled[!Boston.split, ]
 
 Boston.nn.fmla <- neuralnet.fmla("medv", Boston)
+
 Boston.nn.5.3 <- neuralnet(Boston.nn.fmla
                 , data=Boston.train.scaled
                 , hidden=c(5,3)
@@ -87,6 +59,28 @@ Boston.nn.8 <- neuralnet(Boston.nn.fmla
                 , hidden=8
                 , linear.output=T)
 
+# Predict - remember the output is scaled
+Boston.5.3.preds.scaled <- compute(Boston.nn.5.3
+                                      , Boston.test.scaled[,1:13])
+Boston.8.preds.scaled <- compute(Boston.nn.8
+                                      , Boston.test.scaled[,1:13])
+# Results from NN are normalized (scaled)
+# unscale the response to compensate for rounding errors
+Boston.medv.unscaled <- (Boston.test.scaled$medv) * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
+
+# Descaling for comparison
+Boston.5.3.preds <- Boston.5.3.preds.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
+Boston.8.preds <- Boston.8.preds.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
+
+# Calculating MSE
+Boston.5.3.rm <- reg.measures(Boston.5.3.preds, Boston.medv.unscaled)
+Boston.8.rm <- reg.measures(Boston.8.preds, Boston.medv.unscaled)
+
+# Compare the metrics
+Boston.glm.rm
+Boston.5.3.rm
+Boston.8.rm # this model seems to have done slightly better
+
 # Visual plot of the model
 plot(Boston.nn.5.3)
 plot(Boston.nn.8)
@@ -96,95 +90,100 @@ plotnet(Boston.nn.8)
 garson(Boston.nn.8)
 lekprofile(Boston.nn.8) # something wrong as there is one hidden layer
 
+# My custom tools
+B.nn.5.3.diag <- neuralnet.diagnostics(Boston.nn.5.3)
+B.nn.8.diag <- neuralnet.diagnostics(Boston.nn.8)
 
-# Predict - remember the output is scaled
-pr.nn.scaled <- compute(nn, test.scaled[,1:13])
-# Predict - remember the output is scaled
-pr.nn.s.scaled <- compute(nn.s, test.scaled[,1:13])
+# can highlight vars of interest
+nn.varimp.plot(B.nn.5.3.diag)
+nn.varimp.plot(B.nn.8.diag)
 
-# Results from NN are normalized (scaled)
-# unscale the response to compensate for rounding errors
-medv.unscaled <- (test.scaled$medv) * (max(Boston$medv) - min(Boston$medv))+min(Boston$medv)
-
-# Descaling for comparison
-pr.nn <- pr.nn.scaled$net.result * (max(Boston$medv) - min(Boston$medv))+min(Boston$medv)
-pr.nn.s <- pr.nn.s.scaled$net.result * (max(Boston$medv) - min(Boston$medv))+min(Boston$medv)
-
-# Calculating MSE
-MSE.nn <- sum((medv.unscaled - pr.nn)^2)/length(medv.unscaled)
-MSE.nn.s <- sum((medv.unscaled - pr.nn.s)^2)/length(medv.unscaled)
-
-# Compare the two MSEs
-MSE.glm
-MSE.nn
-MSE.nn.s
+# individual effect plots
+nn.profile.xyplot(B.nn.5.3.diag, "crim")
+nn.profile.xyplot(B.nn.5.3.diag, "dis")
+nn.profile.xyplot(B.nn.5.3.diag, "rm")
+nn.profile.xyplot(B.nn.8.diag, "crim")
+nn.profile.xyplot(B.nn.8.diag, "dis")
+nn.profile.xyplot(B.nn.8.diag, "rm")
 
 # Plot predictions
 par(mfrow=c(1,3))
-plot(test$medv,pr.nn,col='red'
-     , main='Real vs predicted NN\ntwo hidden layers'
+plot(Boston.test$medv
+     , Boston.5.3.preds
+     , col="red"
+     , main="Real vs predicted NN\ntwo hidden layers"
      , pch=18
      , cex=0.7
      , xlab = "Actual Median Value"
      , ylab = "Predicted Median Value")
 abline(0,1,lwd=2)
-legend('bottomright',legend='NN'
-       ,pch=18,col='red', bty='n')
+legend("bottomright",legend="NN.5.3"
+       ,pch=18,col="red", bty="n")
 
-plot(test$medv,pr.nn.s,col='green'
-     , main='Real vs predicted NN\nsingle hidden layer'
+plot(Boston.test$medv
+     , Boston.8.preds
+     , col="green"
+     , main="Real vs predicted NN\nsingle hidden layer"
      , pch=18
      , cex=0.7
      , xlab = "Actual Median Value"
      , ylab = "Predicted Median Value")
 abline(0,1,lwd=2)
-legend('bottomright',legend='NN',pch=18,col='green', bty='n')
+legend("bottomright",legend="NN.8",pch=18,col="green", bty="n")
 
-plot(test$medv,pr.glm,col='blue'
-     , main='Real vs predicted lm'
+plot(Boston.test$medv
+     , Boston.glm.preds
+     , col="blue"
+     , main="Real vs predicted lm"
      , pch=18
      , cex=0.7
      , xlab = "Actual Median Value"
      , ylab = "Predicted Median Value")
 abline(0,1,lwd=2)
-legend('bottomright',legend='LM',pch=18,col='blue', bty='n', cex=.95)
+legend("bottomright",legend="LM",pch=18,col="blue", bty="n", cex=.95)
 
 par(mfrow = c(1, 1))
 
 # Compare predictions on the same plot
-plot(test$medv
-     , pr.nn
-     , col='red'
-     , main='Real vs Predicted'
+plot(Boston.test$medv
+     , Boston.5.3.preds
+     , col="red"
+     , main="Real vs Predicted"
      , pch=18,cex=0.7)
-points(test$medv
-       , pr.nn.s
-       , col='green'
+points(Boston.test$medv
+       , Boston.8.preds
+       , col="green"
        , pch=18
        , cex=0.7)
-points(test$medv
-       , pr.glm
-       , col='blue'
+points(Boston.test$medv
+       , Boston.glm.preds
+       , col="blue"
        , pch=18
        , cex=0.7)
 abline(0,1,lwd=2)
-legend('bottomright'
-       , legend=c('NN','NN.s','LM')
+legend("bottomright"
+       , legend=c("NN.5.3","NN.8","LM")
        , pch=18
-       , col=c('red','green','blue'))
+       , col=c("red","green","blue"))
 
 # Cross validating
 # Linear model cross validation
-set.seed(200)
-glm.fit <- glm(medv~.,data=Boston) # full data set
-cv.glm(Boston, glm.fit
+seed.val <- 200
+set.seed(seed.val)
+
+Boston.glm.full <- glm(medv~.,data=Boston) # full data set
+Boston.cv.RMSE <- cv.glm(Boston, Boston.glm.full
+       , cost = RMSE
+       , K=10)$delta[1]
+Boston.cv.MAD <- cv.glm(Boston, Boston.glm.full
+       , cost = MAD
        , K=10)$delta[1]
 # delta[1] is unadjusted for fair comparison
 
 # Neural net cross validation
-set.seed(450)
+set.seed(seed.val)
 k <- 10
-cv.error <- matrix(nrow = k, ncol = 2)
+cv.error <- matrix(nrow = k, ncol = 4)
 
 # Initialize progress bar
 pbar <- create_progress_bar('text')
@@ -194,31 +193,32 @@ folds <- sample(1:k, nrow(Boston)
                 , replace = TRUE)
 
 for(i in 1:k){
-  train.cv <- scaled[folds == i,]
-  test.cv <- scaled[folds != i,]
+  Boston.train.cv <- Boston.scaled[folds == i,]
+  Boston.test.cv <- Boston.scaled[folds != i,]
   
-  nn <- neuralnet(f
-                  , data=train.cv
-                  , hidden=c(5,2)
+  nn.5.3 <- neuralnet(Boston.nn.fmla
+                  , data=Boston.train.cv
+                  , hidden=c(5,3)
                   , linear.output=T)
 
-  nn.s <- neuralnet(f
-                  , data=train.cv
+  nn.8 <- neuralnet(Boston.nn.fmla
+                  , data=Boston.train.cv
                   , hidden=8
                   , linear.output=T)
-  
-    
-  pr.nn.scaled <- compute(nn, test.cv[, 1:13])
-  pr.nn.s.scaled <- compute(nn.s, test.cv[, 1:13])
 
-  pr.nn <- pr.nn.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
-  pr.nn.s <- pr.nn.s.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)  
+  Boston.5.3.preds.scaled <- compute(nn.5.3, Boston.test.cv[, 1:13])
+  Boston.8.preds.scaled <- compute(nn.8, Boston.test.cv[, 1:13])
+
+  Boston.5.3.preds <- Boston.5.3.preds.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
+  Boston.8.preds <- Boston.8.preds.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
   
-  medv.unscaled <- (test.cv$medv) * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
+  medv.unscaled <- (Boston.test.cv$medv) * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
   
   cv.error[i, ] <- c(
-    sum((medv.unscaled - pr.nn)^2)/length(medv.unscaled)
-    , sum((medv.unscaled - pr.nn.s)^2)/length(medv.unscaled)
+    RMSE(medv.unscaled, Boston.5.3.preds)
+    , MAD(medv.unscaled, Boston.5.3.preds)
+    , RMSE(medv.unscaled, Boston.8.preds)
+    , MAD(medv.unscaled, Boston.8.preds)
     )
   
   pbar$step()
@@ -232,14 +232,21 @@ colMeans(cv.error)
 
 # Visual plot of CV results
 boxplot(cv.error
-        , xlab='MSE CV'
-        , col='cyan'
-        , border='blue'
-        , main='CV error (MSE) for NN'
-        , names = c("2h model", "1h model")
+        , xlab="CV Error"
+        , col="cyan"
+        , border="blue"
+        , main="CV error (RMSE and MAD) for Neural Net Models"
+        , names = paste0(rep(c("2h model\n", "1h model\n"), each = 2)
+                        , c("RMSE", "MAD"))
         , horizontal=TRUE)
-# overall 2 h model more stable and lower MSE
+# overall 2 h model more stable and lower RMSE
 # despite early (single run results above)
+t.test(cv.error[,1], cv.error[,3]) # RMSE
+t.test(cv.error[,2], cv.error[,4]) # MAD
+# MAD shows signif difference
+# shows majority of errors are within a smaller bound
+# a few poor error predictions 
+
 
 print(head(College,2))
 
