@@ -1,31 +1,3 @@
-# ----- Utility Funcs -----
-# neuralnet library needs specific setup
-neuralnet.fmla <- function(resp, dt) {
-  r <- resp
-  n <- names(dt)
-  f <- as.formula(paste(r, "~", paste(n[!n %in% r], collapse = " + ")))
-  f
-}
-
-MSE <- function(act, pred) {
-  sum((pred - act)^2)/length(pred)
-} # mean squared error
-
-MAD <- function(act, pred) {
-  median(abs(pred - act))
-} # absolute median deviation
-
-RMSE <- function(act, pred) {
-  sqrt(sum((pred - act)^2)/length(pred))
-} # route mean squared error
-
-reg.measures <- function(act, pred) {
-  MSE.measure <- MSE(act, pred)
-  RMSE.measure <- RMSE(act, pred)
-  MAD.measure <- MAD(act, pred)
-  data.frame(MSE.measure, RMSE.measure, MAD.measure)
-}
-
 # action like a lekprofile
 neuralnet.diagnostics <- function(nn) {
   outs <- unlist(strsplit(
@@ -42,68 +14,128 @@ neuralnet.diagnostics <- function(nn) {
     , split = " + "
     , fixed = TRUE))
   nins <- length(ins)
-  
+
+  # quantiles and ranges for each input.var  
   ins.range <- sapply(nn$data[, ins], range)
   ins.quant <- sapply(nn$data[, ins], quantile)
   
-  ins.mat <- matrix(nrow = 0, ncol = nins, dimnames = list(NULL, ins))
-  pred.mat <- matrix(nrow = 50, ncol = nins, dimnames = list(NULL, ins))
+  # matrix of all the quantiles for all input.vars
+  ins.mat <- ins.quant[rep(1:5, each = 10), ]
+  
+  # empty df to hold the predictions
+  preds <- list()
+  input.vals <- list()
+  preds$quantiles <- rownames(ins.mat)
+  preds$quantiles <- factor(preds$quantiles, levels = c("0%", "25%", "50%", "75%", "100%"), ordered = TRUE)
+  
   for (var in ins) {
-    var.mat <- ins.quant[rep(1:5, each = 10), ]
-    var.mat[, var] <- seq(ins.range[1, var], ins.range[2, var], length.out = 10)
-    ins.mat <- rbind(ins.mat, var.mat)
-    
+    # one input.var at a time
+    # temporarily replace the static quantiles with a incremental range
+    ins.val <- seq(ins.range[1, var], ins.range[2, var], length.out = 10)
+    ins.mat[, var] <- ins.val
+    input.vals[[var]] <- ins.val
+    # empty vector to hold the predictions
+    pred <- numeric(50)
     for (i in 1:5) {
-      pred.mat[1:10 + (i - 1) * 10, var] <- compute(nn, var.mat[1:10 + (i - 1) * 10, ])$net.result
+      pred[1:10 + (i - 1) * 10] <- compute(nn
+      , ins.mat[1:10 + (i - 1) * 10, ])$net.result
+    }
+  # capture
+  preds[[var]] <- pred
+  
+  # reset
+  ins.mat <- ins.quant[rep(1:5, each = 10), ]
+  }
+  preds <- as.data.frame(preds)
+  input.vals <- as.data.frame(input.vals)
+
+  # variable importance from profile  
+  var.imp.p <- matrix(nrow = 3, ncol = nins, dimnames = list(NULL, ins))
+
+  pred.ranges <- as.data.frame(
+                  lapply(preds[, -1]
+                  , function(x) {
+                      tapply(x
+                      , preds$quantiles
+                      , function(y) {
+                        range(y)[2] - range(y)[1]
+                      }
+                    )
+                  }
+                )
+              )
+  for (var in ins) {
+    var.imp.p[, var] <- c(pred.ranges[[var]]["0%"]
+                          , pred.ranges[[var]]["100%"]
+                          , max(pred.ranges[[var]]))
+  }
+
+  dimnames(var.imp.p) <- list(
+    c("vars.quant.0", "vars.quant.100", "max.effect")
+    , NULL)
+  var.imp.p <- data.frame(input.var = factor(ins, levels = ins[order(var.imp.p["max.effect", ], decreasing = TRUE)])
+                          , t(var.imp.p))
+  
+  # variable importance from weights
+  wts <- nn$weights[[1]]
+  layers <- numeric(0)
+  # input layer = rows of wts element 1, minus 1
+  # (the first values is the bias value)
+  layers[1] <- dim(wts[[1]])[1] - 1
+  seq.layers <- seq_along(wts)
+  for (i in seq.layers) {
+    # other layers are the number of columns of each wts element
+    layers[i + 1] <- dim(wts[[i]])[2]
+  }
+
+  # extract the biases and weights
+  bias <- list()
+  ptrons <- list()
+  
+  for (i in seq.layers) {
+    bias[[i]] <- wts[[i]][1, ]
+    ptrons[[i]] <- wts[[i]][-1, ]
+  }
+  
+  # calculate the influence by matrix multiplication
+  for (i in seq.layers) {
+    if (i == 1) {
+      var.imp.w <- ptrons[[i]]
+    } else {
+      var.imp.w <- var.imp.w %*% (ptrons [[i]] * bias[[i - 1]])
     }
   }
+  var.imp.w <- data.frame(input.var = factor(ins, levels = ins[order(abs(var.imp.w), decreasing = TRUE)])
+                          , effect = var.imp.w
+                          , sgn = factor(sign(var.imp.w), labels = c("negative", "positive")))
   
-  quantiles <- rownames(ins.mat)
-  rownames(ins.mat) <- NULL
-  prediction <- data.frame(input.var = rep(ins, each = 50)
-                           , quantiles = rep(rep(rownames(ins.quant), each = 10), nins)
-                           , pred = as.vector(pred.mat)
-                           , ins.mat)
-  prediction$quantiles <- factor(prediction$quantiles, levels = c("0%", "25%", "50%", "75%", "100%"), ordered = TRUE)
-  
-  var.imp <- matrix(nrow = nins, ncol = 3, dimnames = list(ins, NULL))
-  for (var in ins) {
-    pred.ranges <- with(prediction
-                      , tapply(subset(
-                          pred, input.var == var)
-                          , quantiles[1:50]
-                          , range)
-    )
-
-    pred.ranges <- lapply(pred.ranges
-                          , function(x) {
-                            x[2] - x[1]
-                            })
-
-    var.imp[var, ] <- c(pred.ranges$`0%`
-                        , pred.ranges$`100%`
-                        , max(unlist(pred.ranges)))
-  }
-  input.var <- rownames(var.imp)
-  var.imp <- data.frame(input.var, var.imp)
-  names(var.imp) <- c("input.var", "vars.quant.0", "vars.quant.100", "max.effect")
-  return(list(prediction = prediction
-              , variable.importance = var.imp))
+  return(list(preds = preds
+              , var.imp.p = var.imp.p
+              , var.imp.w = var.imp.w
+              , compute.matrix = ins.mat
+              , input.values = input.vals))
 }
 
+library(lattice)
 source("C:\\Dev\\Study\\R\\R_Themes\\MarketingTheme.R")
 nn.profile.plot <- function(nn.diag, var, ...) {
   
-  n <- names(nn.diag$prediction)
-  n <- n[!(n %in% c("input.var", "quantiles", "pred" ))]
+  n <- names(nn.diag$preds)
+  n <- n[n != "quantiles"]
   if (!(var %in% n)) {stop("Variable selected does not exist.")}
-
-  fmla <- as.formula(paste("pred ~", var))
+  
+  preds <- nn.diag$preds
+  preds$input <- nn.diag$input.values[[var]]
+  
+  fmla <- as.formula(paste(var, "~ input"))
   xyplot(fmla
        , group = quantiles
-       , data = nn.diag$prediction
-       , subset = input.var == var
+       , data = preds
        , type = "l"
+       , xlab = paste(var, "(scaled)")
+       , ylab = "Predicted value (scaled)"
+       , main = paste("Profile Plot of changing"
+                      , var, "\nwhile holding other predictors at quantiles")
        , scales = MyLatticeScale
        , strip = MyLatticeStrip
        , par.settings = MyLatticeTheme
@@ -113,13 +145,28 @@ nn.profile.plot <- function(nn.diag, var, ...) {
        , ...)
 }
 
-nn.varimp.plot <- function(nn.diag, ...) {
+nn.varimp.p.plot <- function(nn.diag, ...) {
   
   barchart(max.effect+vars.quant.0+vars.quant.100~input.var
-         , data = nn.diag$variable.importance
+         , data = nn.diag$var.imp.p
+         , ylab = "Range of effect of changing each input
+         while holding the others constant"
          , scales = MyLatticeScale
          , strip = MyLatticeStrip
          , par.settings = MyLatticeTheme
          , auto.key = list(columns = 3)
+         , ...)
+}
+
+nn.varimp.w.plot <- function(nn.diag, ...) {
+  
+  dotplot(abs(effect)~input.var
+         , groups = sgn
+         , data = nn.diag$var.imp.w
+         , ylab = "Result of matrix multiplication of weights"
+         , scales = MyLatticeScale
+         , strip = MyLatticeStrip
+         , par.settings = MyLatticeTheme
+         , auto.key = list(columns = 2)
          , ...)
 }

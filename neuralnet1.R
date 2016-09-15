@@ -6,6 +6,11 @@ library(ISLR)
 library(caTools) # split.sample
 library(boot) # cv.glm
 library(plyr) # for a progress bar
+# link
+# utils <- "https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R"
+# local file
+utils <- "C:\\Dev\\Study\\R\\Utilities\\Utilities.R"
+source(utils)
 
 # ----- Boston Housing Example -----
 # Check that no data is missing
@@ -45,7 +50,7 @@ Boston.scaled <- as.data.frame(scale(Boston
 Boston.train.scaled <- Boston.scaled[Boston.split, ]
 Boston.test.scaled <- Boston.scaled[!Boston.split, ]
 
-Boston.nn.fmla <- neuralnet.fmla("medv", Boston)
+Boston.nn.fmla <- generate.full.fmla("medv", Boston)
 
 Boston.nn.5.3 <- neuralnet(Boston.nn.fmla
                 , data=Boston.train.scaled
@@ -95,16 +100,20 @@ B.nn.5.3.diag <- neuralnet.diagnostics(Boston.nn.5.3)
 B.nn.8.diag <- neuralnet.diagnostics(Boston.nn.8)
 
 # can highlight vars of interest
-nn.varimp.plot(B.nn.5.3.diag)
-nn.varimp.plot(B.nn.8.diag)
+nn.varimp.p.plot(B.nn.5.3.diag)
+nn.varimp.p.plot(B.nn.8.diag)
+
+# can highlight vars of interest
+nn.varimp.w.plot(B.nn.5.3.diag)
+nn.varimp.w.plot(B.nn.8.diag)
 
 # individual effect plots
-nn.profile.xyplot(B.nn.5.3.diag, "crim")
-nn.profile.xyplot(B.nn.5.3.diag, "dis")
-nn.profile.xyplot(B.nn.5.3.diag, "rm")
-nn.profile.xyplot(B.nn.8.diag, "crim")
-nn.profile.xyplot(B.nn.8.diag, "dis")
-nn.profile.xyplot(B.nn.8.diag, "rm")
+nn.profile.plot(B.nn.5.3.diag, "crim")
+nn.profile.plot(B.nn.5.3.diag, "dis")
+nn.profile.plot(B.nn.5.3.diag, "rm")
+nn.profile.plot(B.nn.8.diag, "crim")
+nn.profile.plot(B.nn.8.diag, "dis")
+nn.profile.plot(B.nn.8.diag, "rm")
 
 # Plot predictions
 par(mfrow=c(1,3))
@@ -228,7 +237,11 @@ for(i in 1:k){
 cv.error
 
 # Average MSE
-colMeans(cv.error)
+Boston.5.3.RMSE <- colMeans(cv.error)[1]
+Boston.5.3.MAD <- colMeans(cv.error)[2]
+Boston.8.RMSE <- colMeans(cv.error)[3]
+Boston.8.MAD <- colMeans(cv.error)[4]
+
 
 # Visual plot of CV results
 boxplot(cv.error
@@ -239,63 +252,12 @@ boxplot(cv.error
         , names = paste0(rep(c("2h model\n", "1h model\n"), each = 2)
                         , c("RMSE", "MAD"))
         , horizontal=TRUE)
+
 # overall 2 h model more stable and lower RMSE
 # despite early (single run results above)
+
 t.test(cv.error[,1], cv.error[,3]) # RMSE
 t.test(cv.error[,2], cv.error[,4]) # MAD
 # MAD shows signif difference
 # shows majority of errors are within a smaller bound
-# a few poor error predictions 
-
-
-print(head(College,2))
-
-# Create Vector of Column Max and Min Values
-maxs <- apply(College[,2:18], 2, max)
-mins <- apply(College[,2:18], 2, min)
-# Use scale() and convert the resulting matrix to a data frame
-scaled.data <- as.data.frame(scale(College[,2:18],center = mins, scale = maxs - mins))
-# Check results
-print(head(scaled.data,2))
-
-# Convert Private column from Yes/No to 1/0
-Private = as.numeric(College$Private)-1
-dt = cbind(Private,scaled.data)
-
-# Create Split (any column is fine)
-set.seed(101)
-split = sample.split(dt$Private, SplitRatio = 0.70)
-# Split based off of split Boolean Vector
-train = subset(dt, split == TRUE)
-test = subset(dt, split == FALSE)
-
-# create formula for neuralnet (does not accept y~.)
-r <- "Private"
-n <- names(scaled.data)
-f <- as.formula(paste(r, "~", paste(n[!n %in% r], collapse = " + ")))
-
-# train
-nn <- neuralnet(f, train
-                , hidden=c(10,10,10)
-                , linear.output=FALSE)
-
-# Compute Predictions off Test Set
-predicted.nn.values <- compute(nn,test[2:18])
-pred.nn <- sapply(predicted.nn.values$net.result
-                  , function(x) {
-                    ifelse(x > 0.5, 1, 0)
-                  })
-
-table(pred = pred.nn, actual = test$Private)
-
-
-# infert example
-nn <- neuralnet(case~age+
-                  parity+induced+spontaneous
-                , data=infert
-                , hidden=2
-                , err.fct="ce"
-                , linear.output=FALSE)
-
-nn$result.matrix
-plot(nn)
+# a few poor error predictions
