@@ -108,13 +108,17 @@ nn.varimp.w.plot(B.nn.5.3.diag)
 nn.varimp.w.plot(B.nn.8.diag)
 
 # individual effect plots
-nn.profile.plot(B.nn.5.3.diag, "crim")
-nn.profile.plot(B.nn.5.3.diag, "dis")
 nn.profile.plot(B.nn.5.3.diag, "rm")
-nn.profile.plot(B.nn.8.diag, "crim")
+nn.profile.plot(B.nn.5.3.diag, "crim")
+nn.profile.plot(B.nn.5.3.diag, "lstat")
+nn.profile.plot(B.nn.5.3.diag, "chas")
+nn.profile.plot(B.nn.5.3.diag, "zn")
+
 nn.profile.plot(B.nn.8.diag, "dis")
 nn.profile.plot(B.nn.8.diag, "rm")
-
+nn.profile.plot(B.nn.8.diag, "nox")
+nn.profile.plot(B.nn.8.diag, "crim")
+nn.profile.plot(B.nn.8.diag, "rad")
 # Plot predictions
 par(mfrow=c(1,3))
 plot(Boston.test$medv

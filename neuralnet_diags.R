@@ -97,12 +97,15 @@ neuralnet.diagnostics <- function(nn) {
     ptrons[[i]] <- wts[[i]][-1, ]
   }
   
-  # calculate the influence by matrix multiplication
-  for (i in seq.layers) {
-    if (i == 1) {
-      var.imp.w <- ptrons[[i]]
+  # calculate the influence by weights accumulation
+  var.imp.w <- rnorm(1)
+  for (i in rev(seq.layers)) {
+    var.imp.w <- var.imp.w - bias[[i]]
+    if (layers[i + 1] == 1) {
+      var.imp.w <- var.imp.w - ptrons[[i]]
     } else {
-      var.imp.w <- var.imp.w %*% (ptrons [[i]] * bias[[i - 1]])
+      var.imp.w <- ptrons[[i]] - rep(var.imp.w, each = layers[i])
+      var.imp.w <- apply(var.imp.w, 1, sum)
     }
   }
   var.imp.w <- data.frame(input.var = factor(ins, levels = ins[order(abs(var.imp.w), decreasing = TRUE)])
@@ -113,29 +116,41 @@ neuralnet.diagnostics <- function(nn) {
               , var.imp.p = var.imp.p
               , var.imp.w = var.imp.w
               , compute.matrix = ins.mat
-              , input.values = input.vals))
+              , input.values = input.vals
+              , layers = layers))
 }
 
 library(lattice)
 source("C:\\Dev\\Study\\R\\R_Themes\\MarketingTheme.R")
-nn.profile.plot <- function(nn.diag, var, ...) {
+nn.profile.plot <- function(nn.diag, var = NULL, ...) {
+
+  if (missing(var)) {
+    preds <- gather(nn.diag$preds, input.var, effect, - quantiles)
+    preds$input <- gather(nn.diag$input.values, input.var, input)[, -1]
+    
+    main.title <- "Profile Plot of changing each predictor
+    while holding other predictors at quantiles"
+    fmla <- as.formula("effect ~ input | input.var")
+  } else { 
+    n <- names(nn.diag$preds)
+    n <- n[n != "quantiles"]
+    if (!(var %in% n)) {stop("Variable selected does not exist.")}
   
-  n <- names(nn.diag$preds)
-  n <- n[n != "quantiles"]
-  if (!(var %in% n)) {stop("Variable selected does not exist.")}
+    preds <- nn.diag$preds
+    preds$input <- nn.diag$input.values[[var]]
   
-  preds <- nn.diag$preds
-  preds$input <- nn.diag$input.values[[var]]
+    paste("Profile Plot of changing"
+          , var, "\nwhile holding other predictors at quantiles")
+    fmla <- as.formula(paste(var, "~ input"))
+  }
   
-  fmla <- as.formula(paste(var, "~ input"))
   xyplot(fmla
        , group = quantiles
        , data = preds
        , type = "l"
        , xlab = paste(var, "(scaled)")
        , ylab = "Predicted value (scaled)"
-       , main = paste("Profile Plot of changing"
-                      , var, "\nwhile holding other predictors at quantiles")
+       , main = main.title
        , scales = MyLatticeScale
        , strip = MyLatticeStrip
        , par.settings = MyLatticeTheme
@@ -151,6 +166,10 @@ nn.varimp.p.plot <- function(nn.diag, ...) {
          , data = nn.diag$var.imp.p
          , ylab = "Range of effect of changing each input
          while holding the others constant"
+         , main = "Variable Importance Plot from profile"
+         , sub = paste("Hidden layers"
+                       , paste(layers[-c(1, length(layers))]
+                              , collapse = ", "))
          , scales = MyLatticeScale
          , strip = MyLatticeStrip
          , par.settings = MyLatticeTheme
@@ -164,6 +183,10 @@ nn.varimp.w.plot <- function(nn.diag, ...) {
          , groups = sgn
          , data = nn.diag$var.imp.w
          , ylab = "Result of matrix multiplication of weights"
+         , main = "Variable Importance Plot from weights accumulation"
+         , sub = paste("Hidden layers"
+                       , paste(layers[-c(1, length(layers))]
+                               , collapse = ", "))
          , scales = MyLatticeScale
          , strip = MyLatticeStrip
          , par.settings = MyLatticeTheme
