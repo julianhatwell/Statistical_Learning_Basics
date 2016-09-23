@@ -37,7 +37,7 @@ neuralnet.diagnostics <- function(nn) {
     # empty vector to hold the predictions
     pred <- numeric(50)
     for (i in 1:5) {
-      pred[1:10 + (i - 1) * 10] <- compute(nn
+      pred[1:10 + (i - 1) * 10] <- neuralnet::compute(nn
       , ins.mat[1:10 + (i - 1) * 10, ])$net.result
     }
   # capture
@@ -117,17 +117,20 @@ neuralnet.diagnostics <- function(nn) {
               , var.imp.w = var.imp.w
               , compute.matrix = ins.mat
               , input.values = input.vals
-              , layers = layers))
+              , layers = layers
+              , ptrons = ptrons
+              , bias = bias))
 }
 
 library(lattice)
-source("C:\\Dev\\Study\\R\\R_Themes\\MarketingTheme.R")
+library(tidyr)
 nn.profile.plot <- function(nn.diag, var = NULL, ...) {
 
   if (missing(var)) {
     preds <- gather(nn.diag$preds, input.var, effect, - quantiles)
     preds$input <- gather(nn.diag$input.values, input.var, input)[, -1]
     
+    xlab.title <- "Predictor values (scaled)"
     main.title <- "Profile Plot of changing each predictor
     while holding other predictors at quantiles"
     fmla <- as.formula("effect ~ input | input.var")
@@ -138,8 +141,9 @@ nn.profile.plot <- function(nn.diag, var = NULL, ...) {
   
     preds <- nn.diag$preds
     preds$input <- nn.diag$input.values[[var]]
-  
-    paste("Profile Plot of changing"
+
+    xlab.title <- paste(var, "(scaled)")
+    main.title <- paste("Profile Plot of changing"
           , var, "\nwhile holding other predictors at quantiles")
     fmla <- as.formula(paste(var, "~ input"))
   }
@@ -148,9 +152,12 @@ nn.profile.plot <- function(nn.diag, var = NULL, ...) {
        , group = quantiles
        , data = preds
        , type = "l"
-       , xlab = paste(var, "(scaled)")
+       , xlab = xlab.title
        , ylab = "Predicted value (scaled)"
        , main = main.title
+       , sub = paste("Hidden layers"
+                     , paste(nn.diag$layers[-c(1, length(nn.diag$layers))]
+                             , collapse = ", "))
        , scales = MyLatticeScale
        , strip = MyLatticeStrip
        , par.settings = MyLatticeTheme
@@ -168,7 +175,7 @@ nn.varimp.p.plot <- function(nn.diag, ...) {
          while holding the others constant"
          , main = "Variable Importance Plot from profile"
          , sub = paste("Hidden layers"
-                       , paste(layers[-c(1, length(layers))]
+                       , paste(nn.diag$layers[-c(1, length(nn.diag$layers))]
                               , collapse = ", "))
          , scales = MyLatticeScale
          , strip = MyLatticeStrip
@@ -185,7 +192,7 @@ nn.varimp.w.plot <- function(nn.diag, ...) {
          , ylab = "Result of matrix multiplication of weights"
          , main = "Variable Importance Plot from weights accumulation"
          , sub = paste("Hidden layers"
-                       , paste(layers[-c(1, length(layers))]
+                       , paste(nn.diag$layers[-c(1, length(nn.diag$layers))]
                                , collapse = ", "))
          , scales = MyLatticeScale
          , strip = MyLatticeStrip

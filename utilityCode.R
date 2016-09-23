@@ -5,13 +5,13 @@ library(ggplot2)
 library(parallel)
 library(doParallel)
 
-if (connected) {
-  source("https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R")
-  source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/myFirstTheme.R")
-} else {
-  source("C:\\Dev\\Study\\R\\Utilities\\Utilities.R")
-  source("C:\\Dev\\Study\\R\\R_Themes\\myFirstTheme.R")
-}
+# if (connected) {
+#   source("https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R")
+#   source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/myFirstTheme.R")
+# } else {
+#   source("C:\\Dev\\Study\\R\\Utilities\\Utilities.R")
+#   source("C:\\Dev\\Study\\R\\R_Themes\\myFirstTheme.R")
+# }
 
 # default data pack
 data("diamonds")
@@ -55,12 +55,14 @@ setData <- function(df, resp, makeFactorResp = FALSE) {
     num_classes <- length(levels(factor(df[[resp]])))
   }
   respCol = getRespCol(df, resp)
+  ptype <- if (is.numeric(df[[resp]])) { "regression" } else { "classification"}
   df.e <- list(dt.frm = df
               , resp = resp
               , num_classes = num_classes
               , vars = names(df)[-respCol]
               , vars_fac = sapply(df[-respCol], function(j) { any(class(j) == "factor") } )
               , respCol = respCol
+              , ptype = ptype
              )
   class(df.e) <- "df.enum"
   return(df.e)

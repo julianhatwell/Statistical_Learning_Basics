@@ -18,7 +18,7 @@ Auto1$origin <- factor(Auto1$origin)
 dt <- setData(Auto1, "mpg")
 
 # problem type, either classification or regression, can be over-ridden
-ptype <- if (is.numeric(dt$dt.frm[[dt$resp]])) { "regression" } else { "classification"}
+ptype <- dt$ptype
 
 # use the EDA file to explore the data
 # pick appropriate funcs from the various checks file

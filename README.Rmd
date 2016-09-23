@@ -5,4 +5,6 @@ date: "17 January 2016"
 output: html_document
 ---
 
-# Here is some utility code for statistical learning, especially using caret
+# Statistical Learning Studies
+
+This repo contains various files including some boiler plate utilities based on the caret package, the workings from the book and online course "An Introduction to Statistical Learning with R" and some other personal projects.

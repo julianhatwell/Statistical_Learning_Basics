@@ -1,0 +1,234 @@
+```{r prologue, include=FALSE}
+# connected to internet?
+connected <- FALSE
+
+library(knitr) # pull in the code file
+read_chunk("Neuralnet1.R")
+
+# chunk options
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+
+# figure options
+knitr::opts_template$set(
+  fig.relaxed = list(fig.height = 6, fig.width = 8, fig.align='center')
+  , fig.tile = list(fig.height = 4, fig.width = 4, fig.align='center')
+)
+par(mar = c(4,3,3,1))
+```
+
+```{r load_libraries}
+```
+
+# Artificial Neural Networks in R  
+
+#####Julian Hatwell
+#####`r format(Sys.time(), "%b %Y")`
+## Introduction  
+
+This is a personal project with the objective of learning about Artificial Neural Networks (ANN) and their implementation in R.
+
+All the code is available in my [github repo for statistical learning studies](https://github.com/julianhatwell/Statistical_Learning_Basics). Please take a look at the files named neuralnet*
+
+A basic, succinct and clear explanation of how ANNs wok can be found at [Portilla,  (2016)](https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/), which I paraphrase here:
+
+Neural networks are built from units called perceptrons (ptrons). Ptrons have one or more inputs, an activation function and an output. An ANN model is built up by combining ptrons in structured layers. The ptrons in a given layer are independent of each other, but the each connect to all the ptrons in the next layer.
+
+* The input layer contains a ptron for each predictor variable
+* One or more hidden layers contain a user defined number of ptrons. Each ptron in the first hidden layer receives an input from the each ptron in the input layer. If there is a second hidden layer, each ptron in this layer receives an input from each ptron in the first hidden layer, and so on with additional layers
+* The output layer contains a ptron for each response variable (usually one, sometimes more in multivariate response situations). Each output ptron receives one input from each ptron in the final hidden layer
+* The ptrons have a nonlinear activation function (e.g a logistic function) which determines their output value based upon the values of their inputs.
+
+The connections between ptrons are weighted. The magnitude of the weight controls the influence of that input on the receiving ptron. The sign of the weight controls whether the influence is increasing or decreasing the  signal to the next layer. 
+
+The weights are somewhat analogous to the coefficients of a linear model. There is also a bias adjustment that represents the base Value of a ptron and is analogous to the intercept in a linear model. If the inputs are near zero, the bias ensures that the output is near average. However the situation is much more complex due to the network-like nature of the ANN. This leads to complex, non-linear relationships between the predictors and response.
+
+There are a handful of interesting libraries though in this report I'll focus on the neuralnet package, [Fritsch & Guenther,  (2016)](https://CRAN.R-project.org/package=neuralnet).
+
+[Hasheminia, (2015)](https://www.youtube.com/watch?v=lTMqXSSjCvk) provides a very useful introduction, covering the essential parameters and common steps.
+
+This library is very flexible, allowing the analyst to build ANNs using a number of algorithms, activation functions and error functions and with multiple hidden layers to cover all but the most esoteric scenarios. It has syntax that is not entirely aligned with other model fitting libraries and functions so requires a couple of minor tweaks compared to common modeling functions, e.g. lm and glm.
+
+This example uses the Boston data from the MASS package which contains a number of predictors of median property values in suburbs of Boston, MA, USA. The code used is based on [Alice, (2015)](https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/) and adapted to emphasise and deepen particular topics.
+
+```{r Boston_data, echo=TRUE, opts.label='fig.tile'}
+```
+
+It looks like the predictors tax and rad are highly correlated at > 80%. This can be a problem in some machine learning scenarios but I'm going to ignore it as that's not the focus of this report.
+
+## Linear Model with Ordinary Least Squares
+
+For the purposes of comparison, [Alice, (2015)](https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/) creates a linear model with ordinary least squares (OLS), which I reproduce here.
+
+```{r glm_fit}
+```
+
+## ANN Model fits with neuralnet Library
+
+I'll fit two models for comparison. The first has two hidden layers, with 5 and 3 ptrons, respectively. The second will have just one layer with 8 ptrons. One of the reasons for doing this is that some of the available utilities for analysing ANNs don't work with multiple hidden layers. This is by design in some cases but not easy to explain in others.
+
+As a part of this project, I have created some new tools to get around this limitation.
+
+Code is echoed to show a couple of quirks of the neuralnet library, namely the requirement to give a fully qualified formula. Other than that, the default settings are used for algorithm (rprop+ = resilient back propagation) and error function (sse = sum of squared errors). See R help(neuralnet) for further details on default settings.
+
+The number of ptrons in the hidden layers is given as a numeric vector and the linear.output is set to TRUE, indicating a regression problem.
+
+```{r neuralnet_fit, echo=TRUE}
+```
+
+To create performance metrics for comparison with the OLS model it's necessary to reversing the scaling operation on the responses/predictions. I won't echo that code here as it's visible in the github repository.
+
+I use a utility function to generate Mean Squared Error (MSE), Route Mean Squared Error (RMSE) and Median Absolute Deviation (MAD).
+
+The RMSE and MAD are both on the same scale as the errors and therefore somewhat easier to interpret than the MSE. Large differences between RMSE and MAD are indicitive of skew in the distribution of errors.
+
+```{r performance_metrics}
+```
+
+Both ANN models are quite a lot better at predicting on new data than the OLS model. There's a larger difference between RMSE and MAD for the OLS indicating that the errors are spread with a moderate number of large outliers. 
+
+It appears that the ANN model with a single layer of 8 ptrons is very slightly better, though this doesn't look to be significant. Some further analysis can be done to determine the better of the two more definitively.
+
+## Visualising the ANN
+
+Now that the two models have been trained it is possible to visualise them in a plot. The neuralnet library comes with a default plot function:
+
+```{r include_plot, opts.label='fig.tile'}
+# plot.nn doesn't want to appear in knitr
+knitr::include_graphics(c("plot53nn.png", "plot8nn.png"))
+```
+
+[Beck, (2013)](https://beckmw.wordpress.com/2013/11/14/visualizing-neural-networks-in-r-update/) describes these plots as "leav[ing] much to be desired," and I tend to agree. These plots are difficult to work with. Visually they suffer from a problem of serious clutter, making the interation weights mostly illegible. In addition, the plot.nn function has some undesirable behaviour. In the RStudio environment, the plots appear as pop-outs rather than in the integrated viewer window. The function also doesn't seem to be compatible with knitr, so the images above were exported manually and included as static .png files. 
+
+This issue has been address in the NeuralNetTools library, [Beck, (2015)](http://CRAN.R-project.org/package=NeuralNetTools) which includes a plotnet() function. This gives the following default plots for the same models.
+
+```{r nn_model_NNTools_plots, opts.label='fig.relaxed'}
+```
+
+This elegant plot solves the visual clutter problem by using line thickness to represent weight magnitude and line colour to represent weight sign (black = positive, grey = negative). Other useful features include a colour option for the input layer so that, for example, variable importance can be represented. This will be discussed next.
+
+## Determining variable importance
+
+Given the complex interactions modelled by the ANN, the relative importance of each predictor may not be immediately obvious. One approach to this is to tally the weights through the model from each predictor. The NeuralNetTools (NNT) library implements this as Garson's algorithm. However, this only works for single layer models.
+
+```{r nn_model_NNTools_varimp, echo=TRUE,  opts.label='fig.relaxed'}
+```
+
+It seems plausible with some modification to adapt this algorithm to work a way back from the output, accumulating weight through the hidden layers and applying these intermediate layers to modify the final value for each input. My attempt to do this yields the results below. I use the lattice plotting system rather than ggplot2 as this is my preference. I also opt for a dotplot, which better represents comparison of point values. Barcharts are better reserved for counts.
+
+```{r nn_model_custom_varimp_w,  opts.label='fig.relaxed'}
+```
+
+Comparing the NNT plot with my own, there is a puzzling difference. NNT finds dis to be the most important closely followed by "chas" whereas my own plot reverses their relative positions and finds chas to be an order of magnitude larger. When looking at the NN diagram, we see a greatly thickened line from the chas input to H8, so one needs to think carefully about the operations involved.
+
+Taking a detailed look at the weights involved provides some insight. The chas input ptron has a single huge weight to H8 but the others are small.
+
+On the hand, the dis ptron has 4 moderately sized weights, nothing as large as the individual chas, but the sphere of influence is much broader over the whole model.
+
+```{r nn_model_varimp_w_analyisis, echo=TRUE}
+```
+
+We can now see that the the Garson algorithm assigns variable inportance based on both weights and number of ptrons involved.
+
+According to [Hasheminia, 2015](https://www.youtube.com/watch?v=lTMqXSSjCvk), another important test of variable importance is the weights confidence interval. However, the function to calculate this is not implemented for models with multiple hidden layers. It also doesn't appear to work correctly for this specific example under the Boston data
+
+```{r nn_model_confidence, echo=TRUE}
+```
+
+## Model Profiling
+
+The non-linear relationships between the predictors and response provide a point of interest for the ANN. The lekprofile method (broadly similar to the effect plot) has been devised with ANN in mind but could systematically be used with any multivariate problem.
+
+The model is used to predict new values holding all but one of the predictors level while modifying the final predictor through its full range. This is repeated for all predictors (or simply those of interest).
+
+The resulting graphs yield a fascinating insight on the model behaviour.
+
+I've had trouble getting the NNT library lekprofile function to run with this data. It's also documented as not working for multiple hidden layers. 
+
+```{r nn_model_NNTools_profile, echo=TRUE}
+```
+
+However, given the description of its implementation, I see no reason why it can't be run for multiple hidden layer models. Consequently I've also produced my own version of this plotting function using the lattice graphics system.
+
+```{r nn_model_custom_profile,   opts.label='fig.relaxed'}
+```
+
+An interesting side effect of calculating all the individual predictor effects in this way is that the resulting range of response values gives a novel measure of variable importance.
+
+With this in mind I have constructed a new plot that shows the magnitude of the response range as each predictor is applied through its full range, while holding the other variables at their minima, maxima and whichever level gives the individual predictor its strongest effect (it's not always the min or max of the others).
+
+```{r nn_model_varimp_p,   opts.label='fig.relaxed'}
+```
+
+The results differ from the Garson and weights accumulation methods. This plot is insightful because it's possible to see which variables are only important when other variables are at a minimum and which are still important with all the variables saturated. The interactions between variables is very apparent. Also interesting are the different profiles of variables. Some are unaffected by changes in the other predictors, some are highly suppressed with the others at the maxima, for example.
+
+The most interesting ones can be plotted individually for futher examination.
+
+```{r nn_model_custom_profile_indiv,   opts.label='fig.tile'}
+```
+
+The general weights plot function, gwplot delivers an individual profile plot but it's rather basic and doesn't have the richness of information as the lekprofile approach.
+
+```{r nn_gwplot, opts.label='fig.tile'}
+```
+
+Of course, a common fitted versus actual, and fitted versus residual plots are as useful for comparing model performance. Plotting separately or together can help to diagnose the differences.
+
+```{r pred_fitted_plots, opts.label='fig.relaxed'}
+```
+
+The ANN model with a single hidden layer looks to have the best performance based on how close the points are to the unity line. 
+
+```{r pred_resid_plots, opts.label='fig.relaxed'}
+```
+
+## Cross validation to find best model
+
+The initial performance metrics indicated a very that the performance of the single (8) hidden layer and two (5, 3) hidden layer models are very close with the single layer model just having the edge. The real vs predicted plots above indicate that the single layer model overall is very tight around the unity line, but the outliers are more pronounced.
+
+It's also understood that ANNs are very sensitive to the training data and simply changing the random seed could yield quite different results. The best way to examine with is really the best fit is cross validation.
+
+This process is a cinch with a linear model fit thanks to the boot library. For comparison, this process is run next.
+
+```{r cross_validation_lm, echo=TRUE}
+```
+
+There is not, to my knowledge a similar library for the nn class of objects, so cross validati
+on is hand-coded, using a standard pattern.
+
+```{r cross_validation_nn, echo=TRUE}
+```
+
+These results can be visualised to understand them more clearly.
+
+```{r cross_validation_results_plot, opts.label='fig.relaxed'}
+```
+
+A ttest can be used to determine if the test results are significant:
+
+```{r cross_validation_results_ttest, echo=TRUE}
+```
+
+It would appear that although the cv profiles appear different, this is not siginifant and random chance cannot be ruled out. A result similar result could have occured by chance (e.g. picking a different random seed) and it would not indicate a difference from the null hypothesis.
+
+## References
+Jose Portilla (2016), A Beginner’s Guide to Neural Networks with R! Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2016]
+
+Stefan Fritsch and Frauke Guenther (2016).
+neuralnet: Training of Neural Networks. R
+package version 1.33.
+https://CRAN.R-project.org/package=neuralnet
+
+Hamed Hasheminia (2015), R-Session 11 - Statistical Learning - Neural Networks. Available at:  https://www.youtube.com/watch?v=lTMqXSSjCvk [Accessed September 2016]
+
+Michy Alice (2015), Fitting a neural network in R; neuralnet package. Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2015]
+
+Beck M (2015), NeuralNetTools: Visualization
+and Analysis Tools for Neural Networks. R
+package version 1.4.0, http://CRAN.R-project.org/package=NeuralNetTools
+
+Beck M (2013), Visualizing neural networks in R – update , available at: https://beckmw.wordpress.com/tag/neural-network/ [Accessed September 2015]
+
+http://www.sciencedirect.com/science/article/pii/S0304380004001565
