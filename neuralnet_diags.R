@@ -73,7 +73,7 @@ neuralnet.diagnostics <- function(nn) {
   dimnames(var.imp.p) <- list(
     c("vars.quant.0", "vars.quant.100", "max.effect")
     , NULL)
-  var.imp.p <- data.frame(input.var = factor(ins, levels = ins[order(var.imp.p["max.effect", ], decreasing = TRUE)])
+  var.imp.p <- data.frame(input.var = factor(ins, levels = ins[order(var.imp.p["max.effect", ])])
                           , t(var.imp.p))
   
   # variable importance from weights
@@ -98,23 +98,35 @@ neuralnet.diagnostics <- function(nn) {
   }
   
   # calculate the influence by weights accumulation
-  var.imp.w <- rnorm(1)
+  var.imp.w <- runif(1)
   for (i in rev(seq.layers)) {
     var.imp.w <- var.imp.w - bias[[i]]
     if (layers[i + 1] == 1) {
-      var.imp.w <- var.imp.w - ptrons[[i]]
+      var.imp.w <- var.imp.w * ptrons[[i]]
     } else {
-      var.imp.w <- ptrons[[i]] - rep(var.imp.w, each = layers[i])
+      # sign according to input layer only
+      var.imp.w <- ptrons[[i]] * rep(var.imp.w, each = layers[i])
       var.imp.w <- apply(var.imp.w, 1, sum)
+      if(i == 1) {
+        var.imp.w <- abs(var.imp.w) * sign(apply(ptrons[[i]], 1, sum))
+      }
     }
   }
-  var.imp.w <- data.frame(input.var = factor(ins, levels = ins[order(abs(var.imp.w), decreasing = TRUE)])
+  var.imp.w <- data.frame(input.var = factor(ins, levels = ins[order(abs(var.imp.w))])
                           , effect = var.imp.w
                           , sgn = factor(sign(var.imp.w), labels = c("negative", "positive")))
+
+  # calculate the influence by weights of only the input layer
+  var.imp.f <- apply(ptrons[[1]], 1, sum)
+  var.imp.f <- data.frame(input.var = factor(ins, levels = ins[order(abs(var.imp.f))])
+                          , effect = var.imp.f
+                          , sgn = factor(sign(var.imp.f), labels = c("negative", "positive")))
   
+    
   return(list(preds = preds
               , var.imp.p = var.imp.p
               , var.imp.w = var.imp.w
+              , var.imp.f = var.imp.f
               , compute.matrix = ins.mat
               , input.values = input.vals
               , layers = layers
@@ -184,13 +196,22 @@ nn.varimp.p.plot <- function(nn.diag, ...) {
          , ...)
 }
 
-nn.varimp.w.plot <- function(nn.diag, ...) {
+nn.varimp.w.plot <- function(nn.diag, weight = "w", ...) {
+  
+  if (weight == "w") { 
+    d <- nn.diag$var.imp.w
+    main.title <- "Variable Importance Plot from weights accumulation"
+  } 
+  if (weight == "f") { 
+    d <- nn.diag$var.imp.f
+    main.title <- "Variable Importance Plot from input weights"
+  } 
   
   dotplot(abs(effect)~input.var
          , groups = sgn
-         , data = nn.diag$var.imp.w
+         , data = d
          , ylab = "Result of matrix multiplication of weights"
-         , main = "Variable Importance Plot from weights accumulation"
+         , main = main.title
          , sub = paste("Hidden layers"
                        , paste(nn.diag$layers[-c(1, length(nn.diag$layers))]
                                , collapse = ", "))

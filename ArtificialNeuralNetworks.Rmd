@@ -41,7 +41,7 @@ Neural networks are built from units called perceptrons (ptrons). Ptrons have on
 * The output layer contains a ptron for each response variable (usually one, sometimes more in multivariate response situations). Each output ptron receives one input from each ptron in the final hidden layer
 * The ptrons have a nonlinear activation function (e.g a logistic function) which determines their output value based upon the values of their inputs.
 
-The connections between ptrons are weighted. The magnitude of the weight controls the influence of that input on the receiving ptron. The sign of the weight controls whether the influence is increasing or decreasing the  signal to the next layer. 
+The connections between ptrons are weighted. The magnitude of the weight controls the strength of the influence of that input on the receiving ptron. The sign of the weight controls whether the influence is stimulating or inhibiting the signal to the next layer. 
 
 The weights are somewhat analogous to the coefficients of a linear model. There is also a bias adjustment that represents the base Value of a ptron and is analogous to the intercept in a linear model. If the inputs are near zero, the bias ensures that the output is near average. However the situation is much more complex due to the network-like nature of the ANN. This leads to complex, non-linear relationships between the predictors and response.
 
@@ -51,7 +51,7 @@ There are a handful of interesting libraries though in this report I'll focus on
 
 This library is very flexible, allowing the analyst to build ANNs using a number of algorithms, activation functions and error functions and with multiple hidden layers to cover all but the most esoteric scenarios. It has syntax that is not entirely aligned with other model fitting libraries and functions so requires a couple of minor tweaks compared to common modeling functions, e.g. lm and glm.
 
-This example uses the Boston data from the MASS package which contains a number of predictors of median property values in suburbs of Boston, MA, USA. The code used is based on [Alice, (2015)](https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/) and adapted to emphasise and deepen particular topics.
+This example uses the Boston data from the MASS package which contains a number of predictors of median property values in suburbs of Boston, MA, USA. See help(Boston) for more information. The code used is based on [Alice, (2015)](https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/) and adapted to emphasise and deepen particular topics.
 
 ```{r Boston_data, echo=TRUE, opts.label='fig.tile'}
 ```
@@ -71,7 +71,9 @@ I'll fit two models for comparison. The first has two hidden layers, with 5 and 
 
 As a part of this project, I have created some new tools to get around this limitation.
 
-Code is echoed to show a couple of quirks of the neuralnet library, namely the requirement to give a fully qualified formula. Other than that, the default settings are used for algorithm (rprop+ = resilient back propagation) and error function (sse = sum of squared errors). See R help(neuralnet) for further details on default settings.
+Code is echoed to show a couple of quirks of the neuralnet library, namely the requirement to give a fully qualified formula. It is also necessary to scale the response variable to values falling between [0..1] and the predictor variables to z-scores $\sim{N(0, 1)}$ as discussed in [Olden & Jackson, (2002)](ftp://gis.msl.mt.gov/Maxell/Models/Predictive_Modeling_for_DSS_Lincoln_NE_121510/Modeling_Literature/Olden_ANN's.pdf). 
+
+Other than that, the default settings are used for algorithm (rprop+ = resilient back propagation) and error function (sse = sum of squared errors). See R help(neuralnet) for further details on default settings.
 
 The number of ptrons in the hidden layers is given as a numeric vector and the linear.output is set to TRUE, indicating a regression problem.
 
@@ -87,9 +89,9 @@ The RMSE and MAD are both on the same scale as the errors and therefore somewhat
 ```{r performance_metrics}
 ```
 
-Both ANN models are quite a lot better at predicting on new data than the OLS model. There's a larger difference between RMSE and MAD for the OLS indicating that the errors are spread with a moderate number of large outliers. 
+Both ANN models are quite a lot better at predicting on new data than the OLS model. Though the two-layer model appears to do moderately better. This is expected due its greater flexibility/non-linearity. Some further analysis can be done to determine the better of the two more definitively (see later section on Cross Validation).
 
-It appears that the ANN model with a single layer of 8 ptrons is very slightly better, though this doesn't look to be significant. Some further analysis can be done to determine the better of the two more definitively.
+The difference between RMSE and MAD for all three models indicates that the errors are skewed. The majority of errors must be smaller than the mean error, implying that there are a small number of large outliers. 
 
 ## Visualising the ANN
 
@@ -102,7 +104,7 @@ knitr::include_graphics(c("plot53nn.png", "plot8nn.png"))
 
 [Beck, (2013)](https://beckmw.wordpress.com/2013/11/14/visualizing-neural-networks-in-r-update/) describes these plots as "leav[ing] much to be desired," and I tend to agree. These plots are difficult to work with. Visually they suffer from a problem of serious clutter, making the interation weights mostly illegible. In addition, the plot.nn function has some undesirable behaviour. In the RStudio environment, the plots appear as pop-outs rather than in the integrated viewer window. The function also doesn't seem to be compatible with knitr, so the images above were exported manually and included as static .png files. 
 
-This issue has been address in the NeuralNetTools library, [Beck, (2015)](http://CRAN.R-project.org/package=NeuralNetTools) which includes a plotnet() function. This gives the following default plots for the same models.
+This issue has been addressed by the Neural Interpretation Diagram (NID) described in [Olden & Jackson, (2002)](ftp://gis.msl.mt.gov/Maxell/Models/Predictive_Modeling_for_DSS_Lincoln_NE_121510/Modeling_Literature/Olden_ANN's.pdf) and implemented in the NeuralNetTools library, [Beck, (2015)](http://CRAN.R-project.org/package=NeuralNetTools) as the plotnet() function. This gives the following default plots for the same models.
 
 ```{r nn_model_NNTools_plots, opts.label='fig.relaxed'}
 ```
@@ -111,12 +113,16 @@ This elegant plot solves the visual clutter problem by using line thickness to r
 
 ## Determining variable importance
 
-Given the complex interactions modelled by the ANN, the relative importance of each predictor may not be immediately obvious. One approach to this is to tally the weights through the model from each predictor. The NeuralNetTools (NNT) library implements this as Garson's algorithm. However, this only works for single layer models.
+ANNs have been attributed as having "superior predictive power" while being labelled a "black box" in the same article [Olden & Jackson, (2002)](ftp://gis.msl.mt.gov/Maxell/Models/Predictive_Modeling_for_DSS_Lincoln_NE_121510/Modeling_Literature/Olden_ANN's.pdf). This is because complex interactions can be modelled by the ANN giving highly flexible non-linear response values while this very flexibility  complicates the assessment of the relative importance of each predictor.
+
+Several approaches for illiminating the mechanics of the models are described and compared by [Olden & Jackson, (2002)](ftp://gis.msl.mt.gov/Maxell/Models/Predictive_Modeling_for_DSS_Lincoln_NE_121510/Modeling_Literature/Olden_ANN's.pdf), [Gevrey et al, (2003)](http://www.sciencedirect.com/science/article/pii/S0304380002002570) and further discussed in [Olden et al, (2004)](http://www.sciencedirect.com/science/article/pii/S0304380004001565). The approach used in the NeuralNetTools library [Beck, (2015)](http://CRAN.R-project.org/package=NeuralNetTools) is Garson's algorithm in the garson() function. The resultant plot is shown next, although the garson() function in the NeuralNetTools library also only works for single layer models.
 
 ```{r nn_model_NNTools_varimp, echo=TRUE,  opts.label='fig.relaxed'}
 ```
 
-It seems plausible with some modification to adapt this algorithm to work a way back from the output, accumulating weight through the hidden layers and applying these intermediate layers to modify the final value for each input. My attempt to do this yields the results below. I use the lattice plotting system rather than ggplot2 as this is my preference. I also opt for a dotplot, which better represents comparison of point values. Barcharts are better reserved for counts.
+Garson's algorithm was found by [Olden et al, (2004)](http://www.sciencedirect.com/science/article/pii/S0304380004001565) to be the least reliable method when tested against simulated data. They proposed a number of more reliable approaches. Their preferred option being to calculate the product of the weights through the model from each predictor to the output. I endeavour to create this as a custom function in R which works for any number of hidden layers. I also produce a simplified version that tallies the values of the input layer weights only.
+
+I use the lattice plotting system rather than ggplot2 as this is my preference. I also opt for a dotplot, which better represents comparison of point values. According to Sarkar, (2008) barcharts are better reserved for counts, lengths or measures where the information is encoded in the height or area of the bar.
 
 ```{r nn_model_custom_varimp_w,  opts.label='fig.relaxed'}
 ```
@@ -223,12 +229,21 @@ https://CRAN.R-project.org/package=neuralnet
 
 Hamed Hasheminia (2015), R-Session 11 - Statistical Learning - Neural Networks. Available at:  https://www.youtube.com/watch?v=lTMqXSSjCvk [Accessed September 2016]
 
-Michy Alice (2015), Fitting a neural network in R; neuralnet package. Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2015]
+Michy Alice (2015), Fitting a neural network in R; neuralnet package. Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2016]
 
 Beck M (2015), NeuralNetTools: Visualization
 and Analysis Tools for Neural Networks. R
 package version 1.4.0, http://CRAN.R-project.org/package=NeuralNetTools
 
-Beck M (2013), Visualizing neural networks in R – update , available at: https://beckmw.wordpress.com/tag/neural-network/ [Accessed September 2015]
+Beck M (2013), Visualizing neural networks in R – update , available at: https://beckmw.wordpress.com/tag/neural-network/ [Accessed September 2016]
+
+Julian D. Olden & Donald A. Jackson (2002), Illuminating the ‘‘black box’’: a randomization approach for understanding variable contributions in artificial neural networks, Ecological Modelling 154 pp. 135–150
+
+Julian D. Olden, Michael K. Joy and Russell G. Death (2004), An accurate comparison of methods for quantifying variable importance in
+artificial neural networks using simulated data, Ecological Modelling 178 pp. 389–397
+
+Deepayan Sarkar (2008), Multivariate Data Visualization with R, Seattle: Springer, 2nd Printing p. 57
 
 http://www.sciencedirect.com/science/article/pii/S0304380004001565
+
+http://www.sciencedirect.com/science/article/pii/S0304380002002570

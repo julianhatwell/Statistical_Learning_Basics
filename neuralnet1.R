@@ -29,8 +29,8 @@ load_file_source("https://raw.githubusercontent.com/julianhatwell/Utilities/mast
                  , "C:\\Dev\\Study\\R\\Utilities\\Utilities.R")
 
 # plotting theme
-load_file_source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/MarketingTheme.R"
-                 , "C:\\Dev\\Study\\R\\R_Themes\\MarketingTheme.R")
+load_file_source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/BluesGreysTheme.R"
+                 , "C:\\Dev\\Study\\R\\R_Themes\\BluesGreysTheme.R")
 
 # boiler plate functions based on caret package
 load_file_source("https://raw.githubusercontent.com/julianhatwell/Statistical_Learning_Basics/master/utilityCode.R"
@@ -82,13 +82,14 @@ Boston.lm <- lm(medv~., data=Boston.train)
 sumary(Boston.lm)
 
 ## ---- neuralnet_fit ----
-# The data must be scaled data for the ANN fitting
-# This routine gives values between 0, 1
-maxs <- apply(Boston, 2, max) 
-mins <- apply(Boston, 2, min)
-Boston.scaled <- as.data.frame(scale(Boston
-                              , center = mins
-                              , scale = maxs - mins))
+# The predictor vars must be scaled data for the ANN fitting
+Boston.scaled <- as.data.frame(scale(Boston))
+min.medv <- min(Boston$medv)
+max.medv <- max(Boston$medv)
+# response var must be scaled to [0 < resp < 1]
+Boston.scaled$medv <- scale(Boston$medv
+                    , center = min.medv
+                    , scale = max.medv - min.medv)
 
 # Train-test split
 Boston.train.scaled <- Boston.scaled[Boston.split, ]
@@ -119,7 +120,7 @@ Boston.8.preds.scaled <- neuralnet::compute(Boston.nn.8
                                       , Boston.test.scaled[,1:13])
 # Results from NN are normalized (scaled)
 # unscale the response to compensate for rounding errors
-Boston.medv.unscaled <- (Boston.test.scaled$medv) * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
+Boston.medv.unscaled <- (Boston.test.scaled$medv) * (max.medv - min.medv) + min.medv
 
 # Descaling for comparison
 Boston.5.3.preds <- Boston.5.3.preds.scaled$net.result * (max(Boston$medv) - min(Boston$medv)) + min(Boston$medv)
@@ -168,7 +169,11 @@ garson(Boston.nn.8)
 
 ## ---- nn_model_custom_varimp_w ----
 nn.varimp.w.plot(B.nn.5.3.diag)
+nn.varimp.w.plot(B.nn.5.3.diag, weight = "f")
+
 nn.varimp.w.plot(B.nn.8.diag)
+nn.varimp.w.plot(B.nn.8.diag, weight = "f")
+
 
 ## ---- nn_model_varimp_w_analyisis ----
 # weights from chas input
