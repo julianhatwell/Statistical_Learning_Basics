@@ -174,16 +174,6 @@ nn.varimp.w.plot(B.nn.5.3.diag, weight = "f")
 nn.varimp.w.plot(B.nn.8.diag)
 nn.varimp.w.plot(B.nn.8.diag, weight = "f")
 
-
-## ---- nn_model_varimp_w_analyisis ----
-# weights from chas input
-B.nn.8.diag$ptrons[[1]][4,] # layer 1, ptron 4
-# weights from dis input
-B.nn.8.diag$ptrons[[1]][8,] # layer 1, ptron 8
-# weights from layer 2
-B.nn.8.diag$ptrons[[2]][8] # layer 3, ptron 8
-B.nn.8.diag$ptrons[[2]][c(1, 2, 4, 7)] # layer 2, ptrons 1, 2, 4 and 7
-
 ## ---- nn_model_NNTools_profile ----
 # not working
 # expected to fail
@@ -211,18 +201,28 @@ nn.varimp.p.plot(B.nn.8.diag)
 # individual effect plots
 nn.profile.plot(B.nn.5.3.diag, "rm")
 nn.profile.plot(B.nn.5.3.diag, "crim")
-nn.profile.plot(B.nn.5.3.diag, "lstat")
-nn.profile.plot(B.nn.5.3.diag, "chas")
-nn.profile.plot(B.nn.5.3.diag, "zn")
 
-nn.profile.plot(B.nn.8.diag, "dis")
 nn.profile.plot(B.nn.8.diag, "rm")
 nn.profile.plot(B.nn.8.diag, "nox")
 nn.profile.plot(B.nn.8.diag, "crim")
-nn.profile.plot(B.nn.8.diag, "rad")
 
 ## ---- nn_gwplot ----
-gwplot(Boston.nn.8, selected.covariate = "dis")
+gwplot(Boston.nn.8, selected.covariate = "crim")
+
+## ---- nn_varimp_p_colour_plot ----
+varimp.colours <- function(nn.diag) {
+  varimp.p <- round(nn.diag$var.imp.p$max.effect / sum(nn.diag$var.imp.p$max.effect) * 100)
+  varimp.pal <- myPal.range(max(varimp.p))
+  varimp.cols <- list(varimp.pal[varimp.p]
+                      , myPal[6])
+  return(varimp.cols)
+}
+
+varimp.cols <- varimp.colours(B.nn.5.3.diag)
+plotnet(Boston.nn.5.3, circle_col = varimp.cols)
+
+varimp.cols <- varimp.colours(B.nn.8.diag)
+plotnet(Boston.nn.8, circle_col = varimp.cols)
 
 # ---- pred_fitted_plots ----
 # Plot real vs predictions
@@ -233,8 +233,8 @@ plot(Boston.test$medv
      , main="Real vs predicted NN\ntwo hidden layers"
      , pch=18
      , cex=0.7
-     , xlab = "Actual Median Value"
-     , ylab = "Predicted Median Value")
+     , xlab = "Actual Value"
+     , ylab = "Predicted Value")
 abline(0,1,lwd=2)
 legend("bottomright",legend="NN.5.3"
        ,pch=18,col="red", bty="n")
@@ -245,8 +245,8 @@ plot(Boston.test$medv
      , main="Real vs predicted NN\nsingle hidden layer"
      , pch=18
      , cex=0.7
-     , xlab = "Actual Median Value"
-     , ylab = "Predicted Median Value")
+     , xlab = "Actual Value"
+     , ylab = "Predicted Value")
 abline(0,1,lwd=2)
 legend("bottomright",legend="NN.8",pch=18,col="green", bty="n")
 
@@ -256,8 +256,8 @@ plot(Boston.test$medv
      , main="Real vs predicted lm"
      , pch=18
      , cex=0.7
-     , xlab = "Actual Median Value"
-     , ylab = "Predicted Median Value")
+     , xlab = "Actual Value"
+     , ylab = "Predicted Value")
 abline(0,1,lwd=2)
 legend("bottomright",legend="LM",pch=18,col="blue", bty="n", cex=.95)
 par(mfrow = c(1, 1))
@@ -267,6 +267,8 @@ plot(Boston.test$medv
      , Boston.5.3.preds
      , col="red"
      , main="Real vs Predicted"
+     , xlab = "Actual Value"
+     , ylab = "Predicted Value"
      , pch=18,cex=0.7)
 points(Boston.test$medv
        , Boston.8.preds
@@ -350,8 +352,8 @@ folds <- sample(1:k, nrow(Boston)
                 , replace = TRUE)
 
 for(i in 1:k){
-  Boston.train.cv <- Boston.scaled[folds == i,]
-  Boston.test.cv <- Boston.scaled[folds != i,]
+  Boston.train.cv <- Boston.scaled[folds != i,]
+  Boston.test.cv <- Boston.scaled[folds == i,]
   
   nn.5.3 <- neuralnet(Boston.nn.fmla
                   , data=Boston.train.cv
@@ -379,20 +381,25 @@ for(i in 1:k){
     )
 }
 
+## ---- cross_validation_nn_results ----
 # MSE vector from CV
 cv.error
-
 # Average MSE
 Boston.5.3.RMSE <- colMeans(cv.error)[1]
 Boston.5.3.MAD <- colMeans(cv.error)[2]
 Boston.8.RMSE <- colMeans(cv.error)[3]
 Boston.8.MAD <- colMeans(cv.error)[4]
 
+Boston.5.3.RMSE
+Boston.5.3.MAD
+Boston.8.RMSE
+Boston.8.MAD
+
 ## ---- cross_validation_results_plot ----
 boxplot(cv.error
         , xlab="CV Error"
-        , col="cyan"
-        , border="blue"
+        , col=myPal[4]
+        , border=myPal[1]
         , main="CV error (RMSE and MAD) for Neural Net Models"
         , names = paste0(rep(c("2h model\n", "1h model\n"), each = 2)
                         , c("RMSE", "MAD"))
@@ -407,3 +414,15 @@ t.test(cv.error[,2], cv.error[,4]) # MAD
 # MAD shows signif difference
 # shows majority of errors are within a smaller bound
 # a few poor error predictions
+
+## ---- unused citations ----
+#http://gjar.org/publishpaper/vol2issue2/u37.pdf
+
+#http://www.palisade.com/downloads/pdf/academic/DTSpaper110915.pdf
+
+#http://ijssst.info/Vol-15/No-3/data/3857a148.pdf
+
+
+#http://www.sciencedirect.com/science/article/pii/S0304380004001565
+
+#http://www.sciencedirect.com/science/article/pii/S0304380002002570

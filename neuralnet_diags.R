@@ -15,7 +15,7 @@ neuralnet.diagnostics <- function(nn) {
     , fixed = TRUE))
   nins <- length(ins)
 
-  # quantiles and ranges for each input.var  
+  # quantiles and ranges for each input.var
   ins.range <- sapply(nn$data[, ins], range)
   ins.quant <- sapply(nn$data[, ins], quantile)
   
@@ -139,10 +139,16 @@ library(tidyr)
 nn.profile.plot <- function(nn.diag, var = NULL, ...) {
 
   if (missing(var)) {
+    MyLatticeScale$x <- list(relation = "free")
+    number.of.levels <- length(unique(dimnames(nn.diag$compute.matrix[,])[[1]]))
+    input.vars <- matrix(nrow = 0, ncol = nn.diag$layers[1])
+    for (i in 1:number.of.levels) {
+      input.vars <- rbind(input.vars, nn.diag$input.values)
+    }
     preds <- gather(nn.diag$preds, input.var, effect, - quantiles)
-    preds$input <- gather(nn.diag$input.values, input.var, input)[, -1]
+    preds$input <- gather(input.vars, input.var, input)[, -1]
     
-    xlab.title <- "Predictor values (scaled)"
+    xlab.title <- "Predictor values"
     main.title <- "Profile Plot of changing each predictor
     while holding other predictors at quantiles"
     fmla <- as.formula("effect ~ input | input.var")
@@ -154,7 +160,7 @@ nn.profile.plot <- function(nn.diag, var = NULL, ...) {
     preds <- nn.diag$preds
     preds$input <- nn.diag$input.values[[var]]
 
-    xlab.title <- paste(var, "(scaled)")
+    xlab.title <- var
     main.title <- paste("Profile Plot of changing"
           , var, "\nwhile holding other predictors at quantiles")
     fmla <- as.formula(paste(var, "~ input"))

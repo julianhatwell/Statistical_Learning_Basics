@@ -13,8 +13,8 @@ knitr::opts_chunk$set(warning = FALSE
 
 # figure options
 knitr::opts_template$set(
-  fig.relaxed = list(fig.height = 6, fig.width = 8, fig.align='center')
-  , fig.tile = list(fig.height = 4, fig.width = 4, fig.align='center')
+  fig.standard = list(fig.height = 4, fig.width = 6, fig.align='center')
+  , fig.relaxed = list(fig.height = 6, fig.width = 8, fig.align='center')
 )
 par(mar = c(4,3,3,1))
 ```
@@ -53,7 +53,7 @@ This library is very flexible, allowing the analyst to build ANNs using a number
 
 This example uses the Boston data from the MASS package which contains a number of predictors of median property values in suburbs of Boston, MA, USA. See help(Boston) for more information. The code used is based on [Alice, (2015)](https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/) and adapted to emphasise and deepen particular topics.
 
-```{r Boston_data, echo=TRUE, opts.label='fig.tile'}
+```{r Boston_data, echo=TRUE, opts.label='fig.standard'}
 ```
 
 It looks like the predictors tax and rad are highly correlated at > 80%. This can be a problem in some machine learning scenarios but I'm going to ignore it as that's not the focus of this report.
@@ -97,7 +97,7 @@ The difference between RMSE and MAD for all three models indicates that the erro
 
 Now that the two models have been trained it is possible to visualise them in a plot. The neuralnet library comes with a default plot function:
 
-```{r include_plot, opts.label='fig.tile'}
+```{r include_plot, opts.label='fig.standard'}
 # plot.nn doesn't want to appear in knitr
 knitr::include_graphics(c("plot53nn.png", "plot8nn.png"))
 ```
@@ -117,37 +117,25 @@ ANNs have been attributed as having "superior predictive power" while being labe
 
 Several approaches for illiminating the mechanics of the models are described and compared by [Olden & Jackson, (2002)](ftp://gis.msl.mt.gov/Maxell/Models/Predictive_Modeling_for_DSS_Lincoln_NE_121510/Modeling_Literature/Olden_ANN's.pdf), [Gevrey et al, (2003)](http://www.sciencedirect.com/science/article/pii/S0304380002002570) and further discussed in [Olden et al, (2004)](http://www.sciencedirect.com/science/article/pii/S0304380004001565). The approach used in the NeuralNetTools library [Beck, (2015)](http://CRAN.R-project.org/package=NeuralNetTools) is Garson's algorithm in the garson() function. The resultant plot is shown next, although the garson() function in the NeuralNetTools library also only works for single layer models.
 
-```{r nn_model_NNTools_varimp, echo=TRUE,  opts.label='fig.relaxed'}
+```{r nn_model_NNTools_varimp, echo=TRUE,  opts.label='fig.standard'}
 ```
 
 Garson's algorithm was found by [Olden et al, (2004)](http://www.sciencedirect.com/science/article/pii/S0304380004001565) to be the least reliable method when tested against simulated data. They proposed a number of more reliable approaches. Their preferred option being to calculate the product of the weights through the model from each predictor to the output. I endeavour to create this as a custom function in R which works for any number of hidden layers. I also produce a simplified version that tallies the values of the input layer weights only.
 
 I use the lattice plotting system rather than ggplot2 as this is my preference. I also opt for a dotplot, which better represents comparison of point values. According to Sarkar, (2008) barcharts are better reserved for counts, lengths or measures where the information is encoded in the height or area of the bar.
 
-```{r nn_model_custom_varimp_w,  opts.label='fig.relaxed'}
+```{r nn_model_custom_varimp_w,  opts.label='fig.standard'}
 ```
 
-Comparing the NNT plot with my own, there is a puzzling difference. NNT finds dis to be the most important closely followed by "chas" whereas my own plot reverses their relative positions and finds chas to be an order of magnitude larger. When looking at the NN diagram, we see a greatly thickened line from the chas input to H8, so one needs to think carefully about the operations involved.
-
-Taking a detailed look at the weights involved provides some insight. The chas input ptron has a single huge weight to H8 but the others are small.
-
-On the hand, the dis ptron has 4 moderately sized weights, nothing as large as the individual chas, but the sphere of influence is much broader over the whole model.
-
-```{r nn_model_varimp_w_analyisis, echo=TRUE}
-```
-
-We can now see that the the Garson algorithm assigns variable inportance based on both weights and number of ptrons involved.
-
-According to [Hasheminia, 2015](https://www.youtube.com/watch?v=lTMqXSSjCvk), another important test of variable importance is the weights confidence interval. However, the function to calculate this is not implemented for models with multiple hidden layers. It also doesn't appear to work correctly for this specific example under the Boston data
-
-```{r nn_model_confidence, echo=TRUE}
-```
+Comparing these plots one is immediately struck by the inconsistency in both the ranking and sign of the variable effects with respect to each other. Intuitively one would expect generally similar results but these models have little in common.
 
 ## Model Profiling
 
-The non-linear relationships between the predictors and response provide a point of interest for the ANN. The lekprofile method (broadly similar to the effect plot) has been devised with ANN in mind but could systematically be used with any multivariate problem.
+An empirical approachto this problem is to use profiling which also has the benefit of illuminating the non-linear relationships of each predictor to the response and to each other.
 
-The model is used to predict new values holding all but one of the predictors level while modifying the final predictor through its full range. This is repeated for all predictors (or simply those of interest).
+The lekprofile method is broadly similar an the effect plot and describe in Gevrey et al(2003). This method has been devised with ANN in mind but could systematically be used with any multivariate problem.
+
+In essence, a profiling method uses the generated/learned model to predict new values modifying one predictor through its full range while holding all but one of the predictors level. This is repeated at various levels the static predictors (e.g. quanstandards) and then iterated for all predictors (or simply those of interest).
 
 The resulting graphs yield a fascinating insight on the model behaviour.
 
@@ -165,22 +153,31 @@ An interesting side effect of calculating all the individual predictor effects i
 
 With this in mind I have constructed a new plot that shows the magnitude of the response range as each predictor is applied through its full range, while holding the other variables at their minima, maxima and whichever level gives the individual predictor its strongest effect (it's not always the min or max of the others).
 
+Here a barchart makes sense as we're comparing spans. Namely, the range of the response when the individual predictor is run through its range.
+
 ```{r nn_model_varimp_p,   opts.label='fig.relaxed'}
 ```
 
-The results differ from the Garson and weights accumulation methods. This plot is insightful because it's possible to see which variables are only important when other variables are at a minimum and which are still important with all the variables saturated. The interactions between variables is very apparent. Also interesting are the different profiles of variables. Some are unaffected by changes in the other predictors, some are highly suppressed with the others at the maxima, for example.
+The results differ again from the Garson and weights accumulation methods. This plot is insightful because it's possible to see which variables are only important when other variables are at a minimum and which are still important with all the variables saturated. The interactions between variables is very apparent. Also interesting are the different profiles of variables. Some are unaffected by changes in the other predictors, some are highly suppressed or have vastly different curves with the others at the maxima, for example.
 
 The most interesting ones can be plotted individually for futher examination.
 
-```{r nn_model_custom_profile_indiv,   opts.label='fig.tile'}
+```{r nn_model_custom_profile_indiv,   opts.label='fig.standard'}
 ```
 
-The general weights plot function, gwplot delivers an individual profile plot but it's rather basic and doesn't have the richness of information as the lekprofile approach.
+There is a general weights plot function, gwplot delivers an individual profile plot but it's rather basic and doesn't have the richness of information as the lekprofile approach.
 
-```{r nn_gwplot, opts.label='fig.tile'}
+```{r nn_gwplot, opts.label='fig.standard'}
 ```
 
-Of course, a common fitted versus actual, and fitted versus residual plots are as useful for comparing model performance. Plotting separately or together can help to diagnose the differences.
+Using the variable importance based on the profiled range of values of the response as a result of each predictor, these values can be fed back into the NID plot of the NeuralNetTools function as below. Note that I find it more intuitive in this plot if darker colours model more important variables. This is contrary to the implementation of the garson algorithm for variable importance plot.
+
+```{r nn_varimp_p_colour_plot, opts.label='fig.relaxed'}
+```
+
+## Model Performance
+
+A common fitted versus actual, and fitted versus residual plots are as useful for visually comparing model performance. Plotting separately or together can help to diagnose the differences.
 
 ```{r pred_fitted_plots, opts.label='fig.relaxed'}
 ```
@@ -192,9 +189,7 @@ The ANN model with a single hidden layer looks to have the best performance base
 
 ## Cross validation to find best model
 
-The initial performance metrics indicated a very that the performance of the single (8) hidden layer and two (5, 3) hidden layer models are very close with the single layer model just having the edge. The real vs predicted plots above indicate that the single layer model overall is very tight around the unity line, but the outliers are more pronounced.
-
-It's also understood that ANNs are very sensitive to the training data and simply changing the random seed could yield quite different results. The best way to examine with is really the best fit is cross validation.
+A more rigourous approach to determining model performance is considered good/best practice. The previous plots give a sense that these neuralnet models are better than OLS but how to tell between them? It's also understood from the literature (see references) that ANNs are very sensitive to the training data and simply changing the random seed could yield quite different results. The way to examine which model gives the best predictions is cross validation.
 
 This process is a cinch with a linear model fit thanks to the boot library. For comparison, this process is run next.
 
@@ -207,43 +202,52 @@ on is hand-coded, using a standard pattern.
 ```{r cross_validation_nn, echo=TRUE}
 ```
 
+```{r cross_validation_nn_results}
+```
+
 These results can be visualised to understand them more clearly.
 
 ```{r cross_validation_results_plot, opts.label='fig.relaxed'}
 ```
 
-A ttest can be used to determine if the test results are significant:
+A t-test can be used to determine if the test results are significant:
 
 ```{r cross_validation_results_ttest, echo=TRUE}
 ```
 
-It would appear that although the cv profiles appear different, this is not siginifant and random chance cannot be ruled out. A result similar result could have occured by chance (e.g. picking a different random seed) and it would not indicate a difference from the null hypothesis.
+The 95% confidence intervals from the t-tests contain zero both cases. From this result we can say that the differences in the means of the minimised loss functions (RMSE and MAD) do not yield significantly different results between the two models. The performance of both models is about the same, despite the early indications that the 2 hidden layer model was better.
+
+It cannot escape my attention when using cross validation that OLS seems also to have faired about the same even though the literature suggests that in many cases ANNs are much more powerful algorithms.
+
+## Conclusion
+
+In this report I have explored the neuralnet and NeuralNetTools libraries by adapting some excellent code examples available on public blogs. I have also created some potentially useful diagnostic and exploratory tools of my own.
+
+Despite my ambiguous results comparing to traditional OLS, the literature rates ANNs as one of the most useful and exciting machine learning algorithms which I will continue to use in my own work.
 
 ## References
-Jose Portilla (2016), A Beginner’s Guide to Neural Networks with R! Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2016]
+Portilla, J. (2016), A Beginner’s Guide to Neural Networks with R! Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2016]
 
-Stefan Fritsch and Frauke Guenther (2016).
-neuralnet: Training of Neural Networks. R
-package version 1.33.
-https://CRAN.R-project.org/package=neuralnet
+Fritsch, S & Guenther, F. (2016).
+'neuralnet: Training of Neural Networks' R
+package version 1.33 Available at:
+https://CRAN.R-project.org/package=neuralnet [Accessed September 2016]
 
-Hamed Hasheminia (2015), R-Session 11 - Statistical Learning - Neural Networks. Available at:  https://www.youtube.com/watch?v=lTMqXSSjCvk [Accessed September 2016]
+Hamed, H (2015). 'R-Session 11 - Statistical Learning - Neural Networks' Available at:  https://www.youtube.com/watch?v=lTMqXSSjCvk [Accessed September 2016]
 
-Michy Alice (2015), Fitting a neural network in R; neuralnet package. Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2016]
+Michy, A. (2015). 'Fitting a neural network in R; neuralnet package' Available at: https://www.r-bloggers.com/fitting-a-neural-network-in-r-neuralnet-package/ [Accessed September 2016]
 
-Beck M (2015), NeuralNetTools: Visualization
-and Analysis Tools for Neural Networks. R
-package version 1.4.0, http://CRAN.R-project.org/package=NeuralNetTools
+Beck, M. (2015). 'NeuralNetTools: Visualization
+and Analysis Tools for Neural Networks' R
+package version 1.4.0 Available at: http://CRAN.R-project.org/package=NeuralNetTools [Accessed September 2016]
 
-Beck M (2013), Visualizing neural networks in R – update , available at: https://beckmw.wordpress.com/tag/neural-network/ [Accessed September 2016]
+Beck, M. (2013). 'Visualizing neural networks in R – update' Available at: https://beckmw.wordpress.com/tag/neural-network/ [Accessed September 2016]
 
-Julian D. Olden & Donald A. Jackson (2002), Illuminating the ‘‘black box’’: a randomization approach for understanding variable contributions in artificial neural networks, Ecological Modelling 154 pp. 135–150
+Julian D. Olden & Donald A. Jackson (2002). 'Illuminating the ‘‘black box’’: a randomization approach for understanding variable contributions in artificial neural networks' *Ecological Modelling* 154 pp. 135–150
 
-Julian D. Olden, Michael K. Joy and Russell G. Death (2004), An accurate comparison of methods for quantifying variable importance in
-artificial neural networks using simulated data, Ecological Modelling 178 pp. 389–397
+Julian D. Olden, Michael K. Joy and Russell G. Death (2004). 'An accurate comparison of methods for quantifying variable importance in
+artificial neural networks using simulated data' *Ecological Modelling* 178 pp. 389–397
 
 Deepayan Sarkar (2008), Multivariate Data Visualization with R, Seattle: Springer, 2nd Printing p. 57
 
-http://www.sciencedirect.com/science/article/pii/S0304380004001565
-
-http://www.sciencedirect.com/science/article/pii/S0304380002002570
+Gevrey, M., Dimopoulos, I., Lek, S. (2003). 'Review and comparison of methods to study the contribution of variables in artificial neural network models' *Ecological Modelling* 160, pp 249-264
