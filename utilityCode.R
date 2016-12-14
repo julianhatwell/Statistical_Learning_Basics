@@ -182,6 +182,10 @@ myStandardPartitioning <- function(dt, seed = 23) {
   return(df.c)
 }
 
+flippedTwoClassSummary <- function(data, lev = NULL, model = NULL) {
+  data <- data[, 2:1]
+  twoClassSummary(data, lev = NULL, model = NULL)
+}
 
 # beautiful boiler plate for creating the models
 get_or_train <- function(df, resp, algo
@@ -191,7 +195,9 @@ get_or_train <- function(df, resp, algo
                          , tc = trainControl(method = "cv"
                                             , number = 5
                                             , allowParallel = TRUE)
-                         , seed = 1001) {
+                         , seed = 1001
+                         , thisRun = "1"
+                         , ...) {
   modelFileName <- paste0(modelName, "_", thisRun, ".RData")
   
   if (file.exists(modelFileName)) {
@@ -208,6 +214,18 @@ get_or_train <- function(df, resp, algo
       dots <- list(...)
       argList <- list(fmla, data = df, method = algo)
       
+      if (any(names(dots) == "metric")) {
+        if (!(is.na(dots["metric"]))) {
+          argList["metric"] <- dots["metric"]
+        }
+      }
+
+      if (any(names(dots) == "maximize")) {
+        if (!(is.na(dots["maximize"]))) {
+          argList["maximize"] <- dots["maximize"]
+        }
+      }
+      
       if (any(names(dots) == "trControl")) {
         if (!(is.na(dots["trControl"]))) {
           argList["trControl"] <- dots["trControl"]
@@ -219,10 +237,10 @@ get_or_train <- function(df, resp, algo
           argList["tuneGrid"] <- dots["tuneGrid"]
         }
       }
-      do.call(train, argList)
+      do.call(caret::train, argList)
     }
     assign(modelName, modelTrain(fmla, df, algo
-                            , tuneGrid = tg, trControl = tc)
+                            , tuneGrid = tg, trControl = tc, ...)
            , envir = .GlobalEnv)
     
     # close parallel processing
@@ -396,4 +414,179 @@ myConfMatsPlot <- function(cf) {
             , sub = list(label = expression(paste("Colour and size scaled for emphasis to ", sqrt("Frequency")))
                          , cex = 0.75)
   )
+}
+
+#### --- cross validation - the next generation ---- ####
+# utilities
+getConfmatMetrics <- function(pred, resp, pred.dimname = NULL, resp.dimname = NULL) {
+  confmat <- table(pred, resp)
+  names(dimnames(confmat)) <- c(pred.dimname, resp.dimname)
+  metrics <- confmat.metrics(confmat)
+  return(metrics)  
+}
+
+createMetrics.nb <- function(m, d, t = 0.5
+                             , r = resp
+                             , classLabels = c(TRUE, FALSE)
+                             , pred.dimname = NULL
+                             , resp.dimname = NULL) {
+  resp <- d[[r]]
+  pred <- ifelse(predict(m
+                         , type = "raw"
+                         , newdata = d) > t, classLabels[1], classLabels[2])[, 2]
+  
+  metrics <- getConfmatMetrics(pred, resp, pred.dimname, resp.dimname)
+  metrics$predictions <- pred
+  metrics$cutoff <- t
+  return(metrics)
+}
+
+createMetrics.nb.raw <- function(m, d, t = 0.5
+                                 , r = resp
+                                 , pred.dimname = NULL
+                                 , resp.dimname = NULL) {
+  resp <- d[[r]]
+  pred <- predict(m, type = "raw"
+                  , newdata = d)[, 2]
+}
+
+createMetrics.NB <- function(m, d, t = 0.5
+                             , r = resp
+                             , classLabels = c(TRUE, FALSE)
+                             , pred.dimname = NULL
+                             , resp.dimname = NULL) {
+  resp <- d[[r]]
+  pred <- predict(m, newdata = d) 
+  pred <- ifelse(pred$posterior > t
+                 , classLabels[1]
+                 , classLabels[2])[, 2]
+  
+  metrics <- getConfmatMetrics(pred, resp, pred.dimname, resp.dimname)
+  metrics$predictions <- pred
+  metrics$cutoff <- t
+  return(metrics)
+}
+
+createMetrics.lm <- function(m, d, t = 0.5, r
+                             , classLabels = c(TRUE, FALSE)) {
+  resp <- d[[r]]
+  pred <- ifelse(predict(m
+                         , type = "response"
+                         , newdata = d) > t, classLabels[1], classLabels[2])
+  
+  metrics <- getConfmatMetrics(pred, resp)
+  metrics$predictions <- pred
+  metrics$cutoff <- t
+  return(metrics)
+}
+standardMetrics <- function(m
+                            , d = trn.val.tst$val.nzv
+                            , t = 0.5) {
+  sm <- createMetrics.lm(m = m
+                         , d = d
+                         , t = t
+                         , r = resp)
+  return(sm)
+}
+
+createMetrics.tree <- function(m, d, r) {
+  type <- case_when(
+    ("tree" %in% class(m)) ~ "class"
+    , "randomForest" %in% class(m) ~ "response")
+  
+  resp <- d[[r]]
+  pred <- predict(m, newdata = d, type = type)
+  metrics <- getConfmatMetrics(pred, resp)
+  metrics$predictions <- pred
+  metrics$cutoff <- NA
+  return(metrics)
+}
+
+createMetrics.gbm <- function(m, d, r, n, iters = 100) {
+  t <- "response"
+  n <- round(seq(10, n, length.out = iters))
+  resp <- d[[r]]
+  pred <- predict(m, newdata = d
+                  , type = t, n.trees = n)
+  pred <- ifelse(pred > 0.5, TRUE, FALSE)
+  accuracy <- double(iters)
+  for(i in 1:iters) {
+    confmat <- table(pred[, i], resp)
+    accuracy[i] <- if (dim(confmat)[1] == 2) {
+      (confmat[1,1]+confmat[2,2])/sum(confmat)
+    } else {
+      confmat[rownames(confmat) == colnames(confmat)]/sum(confmat)
+    }
+  }
+  return(accuracy)
+}
+
+drop.preds <- function(x) {
+  rtn <- x
+  rtn$predictions <- NULL
+  rtn$cutoff <- NULL
+  return(rtn)
+}
+
+xval.boot.func <- function(df, type = "fold"
+                           , k = 2, seed = 105
+                           , fmla
+                           , algo = "naiveBayes"
+                           , metrics.func = "createMetrics.nb"
+                           , metrics.args
+                           , ...) {
+  # pre setup
+  set.seed(seed)
+  instances <- nrow(df)
+  fit.list <- list()
+  metrics.list <- list()
+  index.list <- list()
+  instances.list <- list()
+  argList.list <- list()
+  dots <- list(...)
+  
+  # create folds index if required
+  if (type == "fold") {
+    index <- sample(k
+                    , size = instances
+                    , replace = TRUE)
+  }
+  
+  for (i in 1:k) {
+    # get a new copy of metrics function arguments
+    metrics.argList <- metrics.args
+    # create the training set
+    if(type == "fold") {
+      train <- df[index != i, ]
+      test <- df[index == i, ]
+    } else {
+      index <- sample(instances, replace = TRUE)
+      train <- df[index, ]
+      test <- df[-unique(index), ]
+    }
+    argList <- list(formula = fmla
+                    , data = train)
+    for (dot in names(dots)) {
+      argList[dot] <- dots[dot]
+    }
+
+    fit.list[[i]] <- do.call(what = algo
+                             , args = argList)
+    
+    metrics.argList$m <- fit.list[[i]]
+    if (!(any(names(metrics.argList) == "d"))) {
+      metrics.argList$d <- test
+    }
+    metrics.list[[i]] <- do.call(what = metrics.func
+                                 , args = metrics.argList)
+    
+    index.list[[i]] <- index
+    instances.list[[i]] <- list()
+    instances.list[[i]]$train <- train
+    instances.list[[i]]$test <- test
+    argList.list[[i]] <- list()
+    argList.list[[i]]$algo <- argList
+    argList.list[[i]]$metrics <- metrics.argList
+  }
+  return(list(fit.list, metrics.list, index.list, instances.list, argList.list))
 }
