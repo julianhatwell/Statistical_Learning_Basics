@@ -18,8 +18,13 @@ lmod <- lm(childHeight ~ midparentHeight, GaltonFamilies)
 coef(lmod)
 abline(lmod)
 
-beta <- with(GaltonFamilies, cor(midparentHeight, childHeight) * sd(childHeight) / sd(midparentHeight))
-alpha <- with(GaltonFamilies, mean(childHeight) - beta * mean(midparentHeight))
+beta <- with(GaltonFamilies
+             , cor(midparentHeight
+                   , childHeight) *
+               sd(childHeight) / sd(midparentHeight))
+alpha <- with(GaltonFamilies
+              , mean(childHeight) -
+                beta * mean(midparentHeight))
 
 beta1  <- with(GaltonFamilies, sd(childHeight) / sd(midparentHeight))
 alpha1 <- with(GaltonFamilies, mean(childHeight) - beta1 * mean(midparentHeight))
@@ -40,3 +45,4 @@ legend("topleft"
        , lty = 2:3
        , lwd = 2
        , col = c("black", "blue"))
+

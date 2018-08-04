@@ -27,6 +27,15 @@ xtxi <- summary(lmod)$cov.unscaled # solve(t(x) %*% x)
 sqrt(diag(xtxi)) * summary(lmod)$sigma # coefficient SE * RSE
 summary(lmod)$coef[, 2]
 
+
+data(odor, package = "faraway")
+odor
+cov(odor[, -1])
+lmod <- lm(odor~temp+gas+pack, data=odor)
+summary(lmod, cor=TRUE)
+
+apply(FUN=sum, odor[, -1], 1)
+
 lmod <- lm(gamble ~ sex + status + verbal + income, data = teengamb)
 sumary(lmod)
 # r.squared = 1 - RSS / mean centred values
