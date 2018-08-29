@@ -1,0 +1,517 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r setup}
+require(vcd)
+require(vcdExtra)
+require(lattice)
+require(directlabels)
+require(lmtest)
+```
+
+# Visualising Categorical Data
+
+#### Exercise 3.1 The Arbuthnot data in HistData (Example 3.1) also contains the variable Ratio, giving the ratio of male to female births.
+
+(a)	Make a plot of Ratio over Year, similar to Figure 3.1. What features stand out? Which plot do you prefer to display the tendency for more male births?
+
+*Here is the original plot referred to in the question:*
+
+```{r}
+# op <- par(mar = c(4,4,1,1) + .1, cex.lab = 1.25)
+
+data("Arbuthnot", package = "HistData")
+
+with(Arbuthnot, {
+  prob = Males / (Males + Females)
+  plot(x = Year, y = prob, type = "b",
+       ylim = c(0.5, 0.54)
+       , ylab = "Pr (Male)"
+       , main = "Arbuthnot's data on male/female sex ratios in London, 1629-1710")
+  abline(h = 0.5, col = "red", lwd = 2)
+  abline(h = mean(prob), col = "blue")
+  lines(loess.smooth(Year, prob), col = "blue", lwd = 2)
+  text(x = 1640, y = 0.5, expression(H[0]: "Pr(Male)=0.5"),
+       pos = 3, col = "red")
+  })
+```
+
+```{r}
+with(Arbuthnot, {
+  plot(x = Year, y = Ratio, type = "b"
+       , ylim = c(1, max(Ratio) + 0.01)
+       , ylab = "Pr (Male)"
+       , main = "Same plot, this time against ratio")
+  abline(h = 1, col = "red", lwd = 2)
+  abline(h = mean(Ratio), col = "blue") 
+  lines(loess.smooth(Year, Ratio), col = "blue", lwd = 2)
+  text(x = 1640, y = 1, expression(H[0]: "Ratio Male:Female = 1"),
+       pos = 3, col = "red")
+  })
+```
+
+*The plots are essentially identical. The choice to use either would depend on context and audience.*
+
+(b)	Plot the total number of christenings, Males + Females or Total (in 000s) over time. What unusual features do you see?
+
+```{r}
+with(Arbuthnot, {
+  TotC <- (Males + Females)/1000
+  plot(x = Year, y = TotC, type = "b"
+       , ylab = "Christenings (thousands)"
+       , main = "Total number of Christenings (Arbuthnot's data)"
+       )
+  lines(loess.smooth(Year, TotC, degree = 1), col = "blue", lwd = 2)
+  })
+```
+
+*There is a linear increasing trend which is interrupted for almost two decades, presumably by plague. There is a second unexpected dip at around 1705.*
+
+#### Exercise 3.2 Use the graphical methods illustrated in Section 3.2 to plot a collection of geometric distributions for p = 0.2, 0.4, 0.6, 0.8, over a range of values of k = 0, 1, ..., 10.
+
+(a)	With xyplot(), try the different plot formats using points connected with lines, as in Figure 3.9, or using points and lines down to the origin, as in the panels of Figure 3.10.
+
+```{r}
+PL <- expand.grid(k = 0 : 10
+                  , probs = c(0.2, 0.4, 0.6, 0.8))
+geom_df <- data.frame(PL, prob = dgeom(PL$k, PL$probs))
+geom_df$probs = factor(geom_df$probs)
+str(geom_df)
+
+xyplot(prob ~ k | probs, data = geom_df,
+       type = c("h", "p"), pch = 16, lwd = 2, cex = 1.25, layout = c(2, 2),
+       xlab = list("Number of events (k)", cex = 1.25),
+       ylab = list("Probability", cex = 1.25))
+```
+
+(b)	Also with xyplot (), produce one version of a multi-line plot in a single panel that you think shows well how these distributions change with the probability p of success.
+
+```{r}
+# use direct labels as an alternative way to legend a plot (lattice)
+mycol <- palette()[2:5]
+plt <- xyplot(prob ~ k, data = geom_df, groups = probs,
+              type = "b", pch = 15 : 18, lwd = 2, cex = 1.25, col = mycol,
+              xlab = list("Number of events (k)", cex = 1.25),
+              ylab = list("Probability",  cex = 1.25),
+              ylim = c(0, 1)
+              )
+
+library(directlabels)
+direct.label(plt, list("top.points", cex = 1.5, dl.trans(y = y + 0.1)))
+```
+
+(c)	Do the same in a multi-panel version, conditional on p.
+
+```{r}
+# use direct labels as an alternative way to legend a plot (lattice)
+mycol <- palette()[2:5]
+plt <- xyplot(prob ~ k | probs, data = geom_df, groups = probs,
+              layout = c(2,2),
+              type = "b", pch = 15 : 18, lwd = 2, cex = 1.25, col = mycol,
+              xlab = list("Number of events (k)", cex = 1.25),
+              ylab = list("Probability",  cex = 1.25),
+              ylim = c(0, 1)
+              )
+
+library(directlabels)
+direct.label(plt, list("top.points", cex = 1.5, dl.trans(y = y + 0.1)))
+```
+
+#### Exercise 3.3 Use the data set WomenQueue to:
+
+(a)	Produce plots analogous to those shown in Section 3.1 (some sort of bar graph of frequencies).
+
+*First a basic bar plot of the observed frequencies*
+
+```{r}
+data("WomenQueue", package = "vcd")
+barplot(WomenQueue, col = "lightblue", cex.lab = 1.5
+        , xlab = "Number of women"
+        , ylab = "Number of queues"
+        , main = "Basic plot of Frequency Distribution")
+```
+
+(b)	Check for goodness-of-fit to the binomial distribution using the goodfit () methods described in Section 3.3.2.
+
+```{r}
+WQ <- goodfit(WomenQueue, type = "binomial")
+unlist(WQ$par)
+WQ
+summary(WQ)
+```
+
+(c)	Make a reasonable plot showing departure from the binomial distribution.
+
+```{r}
+plot(WQ, type = "hanging", shade = TRUE)
+```
+
+(d)	Suggest some reasons why the number of women in queues of length 10 might depart from a binomial distribution, Bin(n = 10, p = 1/2).
+
+*The estimated p = unlist(WQ$par)[1] They may have chivalrous boyfriends who offer to queue for them, or they may have a lower tolerance for queueing (i.e. they see a queue and turn away)*
+
+#### Exercise 3.4 Continue Example 3.13 on the distribution of male children in families in Saxony by fitting a binomial distribution, Bin(n = 12, p = 1/2) specifying equal probability for boys and girls. [Hint: you need to specify both size and prob values for goodfit().]
+
+(a)	Carry out the GOF test for this fixed binomial distribution. What is the ratio of $\frac{\chi^2}{df}$? What do you conclude?
+
+```{r}
+data("Saxony", package = "vcd")
+SX <- goodfit(Saxony, type = "binomial", par = list(prob = 0.5, size = 12))
+sumSX <- summary(SX)
+```
+
+*The ratio of $\frac{\chi^2}{df}$ is $\frac{ `r round(sumSX[1,1],4)` }{ `r sumSX[1,2]` } = `r round(sumSX[1,1]/sumSX[1,2],4) `$*
+
+*This is well above the rule of thumb 2.5 indicating a very poor fit to the binomial distribution, Bin(n = 12, p = 1/2). The p values is also approximately zero.*
+
+(b)	Test the additional lack of fit for the model Bin(n = 12, p = $\hat{p}$)  compared to the model Bin(n = 12, p = $\hat{p}$) where $\hat{p}$ is estimated from the data.
+
+*The model fit and estimated from the data is:*
+
+```{r}
+Sax_fit <- goodfit(Saxony, type = "binomial")
+unlist(Sax_fit$par) # estimated parameters
+```
+
+(c)	Use the plot.gootfit () method to visualize these two models.
+
+```{r}
+plot(SX, shade = TRUE, main = "p = 0.5")
+plot(Sax_fit, shade = TRUE, main = expression(paste("p = ", hat(p))))
+```
+
+#### Exercise 3.5 For the Federalist data, the examples in Section 3.3.1 and Section 3.3.2 showed the negative binomial to provide an acceptable fit. Compare this with the simpler special case of geometric distribution, corresponding to n = 1.
+
+(a)	Use goodfit() to fit the geometric distribution. [Hint: use type="nbinomial", but specify size=1 as a parameter.]
+
+```{r}
+Fed_fitg <- goodfit(Federalist, type = "nbinomial", par = list(size = 1))
+unlist(Fed_fitg$par)
+sumFg <- summary(Fed_fitg)
+```
+
+(b)	Compare the negative binomial and the geometric models statistically, by a likelihood-ratio test of the difference between these two models.
+
+```{r}
+Fed_fitn <- goodfit(Federalist, type = "nbinomial")
+unlist(Fed_fitn$par)
+sumFn <- summary(Fed_fitn)
+
+pchisq(sumFg[1]-sumFn[1], df = sumFg[2]-sumFn[2], lower.tail = FALSE)
+```
+
+(c)	Compare the negative binomial and the geometric models visually by hanging rootograms or other methods.
+
+```{r}
+plot(Fed_fitg, shade = TRUE, main = "geometric model")
+plot(Fed_fitn, shade = TRUE, main = "negative binomial model")
+
+distplot(Federalist, type = "nbinomial", size = 1
+         , main = "geometricness plot")
+distplot(Federalist, type = "nbinomial", main = "negative binomialness plot")
+```
+
+#### Exercise 3.6 Mosteller and Wallace (1963, Table 2.4) give the frequencies, nk, of counts k = 0, 1, … of other selected marker words in 247 blocks of text known to have been written by Alexander Hamilton. The data below show the occurrences of the word upon, that Hamilton used much more than did James Madison.
+
+(a)	Read these data into R and construct a one-way table of frequencies of counts or a matrix or data frame with frequencies in the first column and the corresponding counts in the second column, suitable for use with goodfit().
+
+```{r, echo = TRUE}
+count <- 0:5
+Freq <- c(129, 83, 20, 9, 5, 1)
+```
+
+```{r}
+upon <- data.frame(Freq, count)
+```
+
+(b)	Fit and plot the Poisson model for these frequencies.
+
+```{r}
+upon.gf.pois <- goodfit(upon, type = "poisson")
+summary(upon.gf.pois)
+plot(upon.gf.pois, shade = TRUE)
+```
+
+(c)	Fit and plot the negative binomial model for these frequencies.
+
+```{r}
+upon.gf.nbin <- goodfit(upon, type = "nbinomial")
+summary(upon.gf.nbin)
+plot(upon.gf.nbin, shade = TRUE)
+```
+
+(d)	What do you conclude?
+
+*Negative binomial seems to be a better model as the heavier tail lines up better with frequencies of counts 2 and 4.*
+
+#### Exercise 3.7 The data frame Geissler in the vcdExtra package contains the complete data from Geissler's (1889) tabulation of family sex composition in Saxony.
+
+(a)	Read these data into R.
+
+```{r, echo = TRUE}
+data("Geissler", package = "vcdExtra")
+Saxony11 <- subset(Geissler, size==11, select=c(boys, Freq))
+rownames(Saxony11) <- NULL
+Saxony11 <- xtabs(Freq~boys, Saxony11)
+```
+
+(b)	Following Example 3.13, use goodfit() to fit the binomial model and plot the results. Is there an indication that the binomial does not fit these data?
+
+```{r}
+Sax.11.gof <- goodfit(Saxony11, type = "binomial")
+summary(Sax.11.gof)
+plot(Sax.11.gof, shade = TRUE)
+```
+
+*There is evidence of a lack of fit as these data have heavier tails than the binomial distribution*
+
+(c)	Diagnose the form of the distribution using the methods described in Section 3.4.
+
+```{r}
+Ord_plot(Saxony11)
+```
+
+*The ord plot suggests that the binomial is the correct model. However an ord plot has not completely robust and only chooses from 4 options.*
+
+(d)	Try fitting the negative binomial distribution, and use distplot () to diagnose whether the negative binomial is a reasonable fit.
+
+```{r, eval=FALSE}
+# not sure why this isn't working
+Sax.11.gof <- goodfit(Saxony11, type = "nbinomial")
+summary(Sax.11.gof)
+plot(Sax.11.gof, shade = TRUE)
+```
+
+#### Exercise 3.8 The data frame Bundesliga gives a similar data set to that for UK soccer scores (UKSoccer) examined in Example 3.9, but over a wide range of years. The following lines calculate a two-way table, BL1995, of home-team and away-team goals for the 306 games in the year 1995.
+
+```{r, echo = TRUE}
+data("Bundesliga", package = "vcd")
+BL1995 <- xtabs(~HomeGoals + AwayGoals, data = Bundesliga, subset = (Year == 1995))
+BL1995
+```
+
+(a)	As in Example 3.9, find the one-way distributions of HomeGoals, AwayGoals, and TotalGoals = HomeGoals + AwayGoals.
+
+```{r}
+BL1995.df <- as.data.frame(BL1995, stringsAsFactors = FALSE)
+BL1995.df <- within(BL1995.df, {
+  HomeGoals <- as.numeric(HomeGoals)       # make numeric
+  AwayGoals <- as.numeric(AwayGoals)       # make numeric
+  Total <- HomeGoals + AwayGoals           # total goals
+})
+
+BL1995.df <- expand.dft(BL1995.df)   # expand to ungrouped form
+apply(BL1995.df, 2, FUN = function(x) c(mean = mean(x), var = var(x)))
+```
+
+(b)	Use goodfit() to fit and plot the Poisson distribution to each of these. Does the Poisson seem to provide a reasonable fit?
+
+```{r}
+H <- goodfit(BL1995.df$HomeGoals)
+A <- goodfit(BL1995.df$AwayGoals)
+plot(H, shade = TRUE)
+plot(A, shade = TRUE)
+```
+
+*Poisson model appears to be a good fit in both cases, though notice a very slight anomaly at away goals 6.
+
+(c)	Use distplot() to assess fit of the Poisson distribution.
+
+```{r}
+distplot(apply(BL1995, 1, sum))
+distplot(apply(BL1995, 2, sum))
+```
+
+(d)	What circumstances of scoring goals in soccer might cause these distributions to deviate from Poisson distributions?
+
+*If a player is sent off, it might cause lambda to increase during the course of the game. Likewise there may be a tipping point, once a team has scored 4 goals to a low opposition score, the opposition team might cave in and allow further additional goals than might be expected. These are all factors related to people and the psychology of the game that might easily detract from a theoretical model.*
+
+*Perhaps another explanation is where teams have very different ability, making $\lambda$ non-constant among the observations.*
+
+#### Exercise 3.9 * Repeat the exercise above, this time using the data for all years in which there was the standard number (306) of games, that is for Year>1965, tabulated as shown below.
+
+```{r, echo = TRUE}
+data("Bundesliga", package = "vcd")
+BL <- xtabs(~HomeGoals + AwayGoals, data = Bundesliga, subset = (Year > 1965))
+BL
+```
+
+```{r}
+BL.df <- as.data.frame(BL, stringsAsFactors = FALSE)
+BL.df <- within(BL.df, {
+  HomeGoals <- as.numeric(HomeGoals)       # make numeric
+  AwayGoals <- as.numeric(AwayGoals)       # make numeric
+  Total <- HomeGoals + AwayGoals           # total goals
+})
+
+BL.df <- expand.dft(BL.df)   # expand to ungrouped form
+apply(BL.df, 2, FUN = function(x) c(mean = mean(x), var = var(x)))
+```
+
+*There is a marked difference between the mean and the var HomeGoals, slight in AwayGoals and consequently TotalGoals also has a marked difference. This would indicate perhaps something other than a poisson model.*
+
+"So, the mean and variance of the Poisson distribution are always the same, which is sometimes used to identify a distribution as Poisson. For the binomial distribution, the mean (Np) is always greater than the variance (Npq); for other distributions (negative binomial and geometric) the mean is less than the variance."
+
+*Friendly, Michael. Discrete Data Analysis with R. Chapman and Hall/CRC, 20151211.*
+
+```{r}
+H <- goodfit(BL.df$HomeGoals)
+A <- goodfit(BL.df$AwayGoals)
+plot(H, shade = TRUE)
+plot(A, shade = TRUE)
+```
+
+*The rootograms reflect the above supposition. There is a somewhat poor fit with poisson.*
+
+```{r}
+distplot(apply(BL, 1, sum))
+distplot(apply(BL, 2, sum))
+```
+
+*Here the dist plots do not reveal any problem with the poisson model.*
+
+```{r}
+Ord_plot(as.table(apply(BL, 1, sum)))
+Ord_plot(as.table(apply(BL, 2, sum)))
+```
+
+*However, the Ord plots are suggesting a negative binomial is a better fit.*
+
+```{r}
+H <- goodfit(BL.df$HomeGoals, type = "nbinomial")
+A <- goodfit(BL.df$AwayGoals, type = "nbinomial")
+plot(H, shade = TRUE)
+plot(A, shade = TRUE)
+```
+
+*Indeed, negative binomial appears to be a much better fit. This implies a non-contant $\lambda$ among the observations, which could perhaps be explained by trending changes in rules, gameplay and strategies over the years.*
+
+#### Exercise 3.10 Using the data CyclingDeaths introduced in Example 3.6 and the one-way frequency table CyclingDeaths.tab = table(CyclingDeaths$deaths),
+
+(a)	Make a sensible plot of the number of deaths overtime. For extra credit, add a smoothed curve (e.g., using lines(lowess(.))).
+
+```{r}
+data("CyclingDeaths", package = "vcdExtra")
+CyclingDeaths.tab = table(CyclingDeaths$deaths)
+oldpar <- par()
+par(mar = c(4,4,1,2))
+plot(CyclingDeaths, type = "l", col = "lightgrey")
+axis(4, at = round(c(0, exp(c(0,1,2))),1), col = "blue", col.ticks = "blue", col.axis = "blue")
+lines(loess.smooth(CyclingDeaths$date, exp(CyclingDeaths$deaths), span = 0.1, degree = 1), col = "blue")
+text(max(xy.coords(CyclingDeaths)$x) + 75, 2.4, pos = 2, "deaths (trend)", col = "blue")
+par(oldpar)
+```
+
+(b)	Test the goodness of fit of the table CyclingDeaths.tab to a Poisson distribution statistically using goodfit().
+
+```{r}
+CD.gof <- goodfit(CyclingDeaths.tab, type = "poisson")
+summary(CD.gof)
+```
+
+(c)	Continue this analysis using a rootogram () and distplot ().
+
+```{r}
+plot(CD.gof, shade = TRUE)
+distplot(CyclingDeaths.tab)
+```
+
+(d)	Write a one-paragraph summary of the results of these analyses and your conclusions.
+
+*Based on the rule of thumb for the ratio of $\frac{\chi^2}{df} \approx 2.5$ in the goodness of fit test, a poisson model would seem to be a reasonable fit. The two plots again show a reasonable fit although there is potentially a quirk at occurences = 2, which falls short compared to the model.*
+
+#### Exercise 3.11 * The one-way table, Depends, in vcdExtra and shown below gives the frequency distribution of the number of dependencies declared in 4,983 R packages maintained on the CRAN distribution network on January 17, 2014. That is, there were 986 packages that had no dependencies, 1,347 packages that depended on one other package, ...up to 2 packages that depended on 14 other packages.
+
+```{r, echo = TRUE}
+data("CyclingDeaths", package = "vcdExtra")
+```
+
+(a)	Make a bar plot of this distribution.
+
+```{r}
+barplot(Depends, ylab = "Number of Packages"
+        , xlab = "Number of Dependencies"
+        , main = "Number of Package Dependencies
+        for Packages on CRAN, January 17, 2014")
+```
+
+
+(b)	Use Ord_plot () to see if this method can diagnose the form of the distribution.
+
+```{r}
+Ord_plot(Depends)
+```
+
+
+(c)	Try to fit a reasonable distribution to describe dependencies among R packages.
+
+*To start with the Ord plot has given no diagnosis. There is a significant outlier at 12 dependencies, and a loss of linearity which is not visible in the bar plot, so it would be interesting to see if this feature is visible at log scale.*
+
+```{r}
+barplot(log(Depends), ylab = "log(Number) of Packages"
+        , xlab = "Number of Dependencies"
+        , main = "Number of Package Dependencies
+        for Packages on CRAN, January 17, 2014"
+        )
+```
+
+*Indeed there is a visible kink at freq 12 and 13 that don't seem to follow the trend. Does the Ord plot do better at log scale?*
+
+```{r}
+Ord_plot(log(Depends))
+```
+
+*The outlier contiunues to be influential and there is a loss of linearity for the Ord plot of log(dependencies). It's not all that helpful.*
+
+*A hypothesis based on increasing frequency of depencencies as a trend over time. Over the years, developers build on the previous work of others and the possibility/probability of re-use of older packages increases. This would suggest s distribution with a non-constant $\lambda$ such as the negative binomial.*
+
+```{r}
+Dep.gof <- goodfit(Depends, type = "nbinom")
+plot(Dep.gof, shade = TRUE)
+distplot(Depends, type= "nbinom")
+```
+
+*The rootogram and dist plot show some support, but there are still shortcomings to investigate further, especially in the tail region.*
+
+#### Exercise 3.12 * How many years does it take to get into the baseball Hall of Fame? The Lahman (Friendly, 2014b) package provides a complete record of historical baseball statistics from 1871 to the present. One table, HallOfFame, records the history of players nominated to the Baseball Hall of Fame, and those eventually inducted. The table below, calculated in help(HallOfFame, package=“Lahman”), records the distribution of the number of years taken (from first nomination) for the 109 players in the Hall of Fame to be inducted (1936–present). Note that years==0 does not, and cannot, occur in this table, so the distribution is restricted to positive counts. Such distributions are called zero-truncated distributions. Such distributions are like the ordinary ones, but with the probability of zero being zero. Thus the other probabilities are scaled up (i.e., divided by 1 – Pr(Y = 0)) so they sum to 1.
+
+ (a)	For the Poisson distribution, show that the zero-truncated probability function can be expressed in the form
+
+(b)	Show that the mean is λ/(1 – exp(–λ)).
+
+(c)	Enter these data into R as a one-way table, and use goodfit () to fit the standard Poisson distribution, as if you hadn't encountered the problem of zero truncation.
+
+```{r}
+years <- c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15)
+inducted <- c(46,10,8,7,8,4,2,4,6,3,3,1,4,1,2)
+HoF <- matrix(c(inducted,years), nrow = 15, ncol = 2)
+HoF
+HoF.gof <- goodfit(HoF, type = "poisson")
+plot(HoF.gof, shade = TRUE)
+```
+
+*The graph looks like a terrible fit. The zero truncation is an important phenomenon to address when fitting a model to this data.*
+
+```{r}
+years <- c(1,2,3,4,5,6,7,8,9,10,11,12,13,14,15) -1
+inducted <- c(46,10,8,7,8,4,2,4,6,3,3,1,4,1,2)
+HoF <- matrix(c(inducted,years), nrow = 15, ncol = 2)
+HoF
+HoF.gof <- goodfit(HoF, type = "poisson")
+plot(HoF.gof, shade = TRUE)
+```
+
+*The data have been simply shifted but this doesn't alter the shape of the fit, which is very poor.*
+
+```{r}
+HoF.gof <- goodfit(HoF, type = "nbinom")
+summary(HoF.gof)
+plot(HoF.gof, shade = TRUE)
+distplot(HoF, type = "nbinom")
+```
+
+*Again, the negative binomial is a much better fit.*

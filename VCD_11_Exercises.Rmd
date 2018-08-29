@@ -1,0 +1,890 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r setup}
+require(vcd)
+require(vcdExtra)
+require(MASS)
+require(car)
+require(lmtest)
+require(ggplot2)
+require(GGally)
+require(AER)
+require(lattice)
+require(effects)
+require(splines)
+library(gam)
+require(pscl)
+theme_set(theme_bw())  # set default ggplot theme
+
+source("https://raw.githubusercontent.com/julianhatwell/R_Themes/master/simpleTheme.R")
+```
+
+---
+title: "VCD 11 Exercises"
+author: "Julian Hatwell"
+date: "5 April 2016"
+output: html_document
+---
+
+## 11.1 
+Poole (1989) studied the mating behavior of elephants over 8 years in Amboseli National Park, Kenya. A focal aspect of the study concerned the mating success of males in relation to age, since larger males tend to be more successful in mating. Her data were used by Ramsey and Schafer (2002, Chapter 22 ) as a case study, and are contained in the Sleuth2 (Ramsey et al., 2012) package (Ramsey et al., 2012) as case2201.
+
+For convenience, rename this to elephants, and study the relation between Age (at the beginning of the study) and number of successful Matings for the 41 adult male elephants observed over the course of this study, ranging in age from 27-52.
+
+```{r}
+data("case2201", package = "Sleuth2")
+eleph <- case2201
+```
+
+(a)	Create some exploratory plots of Matings against Age in the styles illustrated in this chapter. To do this successfully, you will have to account for the fact that Matings has a range of only 0-9, and use some smoothing methods to show the trend.
+
+```{r}
+matings.fac <- factor(eleph$Matings, levels = 0:9)
+matings.tab <- table(matings.fac)
+
+with(eleph, c(mean = mean(Matings), var = var(Matings),
+                ratio = var(Matings) / mean(Matings)))
+
+barplot(matings.tab, xlab = "Number of matings"
+        , ylab = "Frequency"
+        , col = "lightblue")
+abline(v = mean(eleph$Matings), col = "red", lwd = 3)
+ci <- mean(eleph$Matings) +
+  c(-1, 1) * sd(eleph$Matings)
+lines(x = ci, y = c(-0.1, -0.1), col = "red", lwd = 3, xpd = TRUE)
+
+plot(jitter(Matings)~Age, data = eleph
+     , ylab = "log(Matings)")
+lines(lowess(eleph$Age, eleph$Matings), col = "blue", lwd = 3)
+
+matings.gof <- goodfit(matings.tab, type = "poisson")
+plot(matings.gof
+    , main = "Poisson model fit on matings")
+matings.gof <- goodfit(matings.tab, type = "nbinomial")
+plot(matings.gof
+    , main = "NBinom model fit on matings")
+```
+
+(b)	Repeat (a) above, but now plotting log(Matings+1) against Age to approximate a Poisson regression with a log link and avoid problems with the zero counts.
+
+```{r}
+barplot(matings.tab + 1, ylab = "log(Frequency+1)"
+        , xlab = "Number of matings"
+        , col = "lightblue", log = "y")
+abline(v = mean(eleph$Matings), col = "red", lwd = 3)
+ci <- mean(eleph$Matings) +
+  c(-1, 1) * sd(eleph$Matings)
+lines(x = ci, y = c(0.9, 0.9), col = "red", lwd = 3, xpd = TRUE)
+
+plot(jitter(Matings + 1)~Age, data = eleph, log = "y"
+     , ylab = "log(Matings)")
+lines(lowess(eleph$Age, eleph$Matings + 1), col = "blue", lwd = 3)
+
+matings.gof.log <- goodfit(log(matings.tab +1), type = "poisson")
+plot(matings.gof.log
+    , main = "Poisson model fit on log(matings)")
+matings.gof.log <- goodfit(log(matings.tab +1), type = "nbinomial")
+plot(matings.gof.log
+    , main = "NBinom model fit on log(matings)")
+```
+
+*Goodfit plot appears best with a negative binomial over the log. There is a hint of zero inflation and strange feature of the graph and one wonders if 8 matings has been miscategorised systematically to 9.*
+
+(c)	Fit a linear Poisson regression model for Matings against Age. Interpret the fitted model verbally from a graph of predicted number of matings and/or from the model coefficients. (Hint: Using Age-27 will make the intercept directly interpretable.)
+
+```{r}
+eleph.glm <- glm(Matings~I(Age-27), data = eleph
+                 , family = "poisson")
+Anova(eleph.glm, test = "Wald")
+```
+
+*These results inform that there is very good evidence to reject the null model. The coefficients and st.err suggest the following:*
+
+```{r}
+Int <- exp(coeftest(eleph.glm))[1,1]
+IntRng <- exp(confint(eleph.glm))[1,]
+Slope <- exp(coeftest(eleph.glm))[2,1]
+SlopeRng <- exp(confint(eleph.glm))[2,]
+```
+
+*The youngest elephants, aged 27, mated on average `r round(IntRng[1],2)` to `r round(IntRng[2],2)` times. Over the 26 year age range (to 52 years of age), this rises to $\approx{}$ `r round(Int, 2)` * `r round(Slope, 2)` (`r round(SlopeRng[1], 2)` to `r round(SlopeRng[2], 2)`)$^{26}$ = `r round(Int * Slope^26, 2)` (`r round(IntRng[1] * SlopeRng[1]^26, 2)` to `r round(IntRng[2] * SlopeRng[2]^26, 2)`)*
+
+```{r}
+g <- ggplot(data = eleph, aes(x = Age, y = I(Matings+1))) +
+  geom_point() + scale_y_log10() + ylab("log(Matings)")
+
+g + stat_smooth(method = glm,
+              method.args = list(family = "poisson")) +
+  ggtitle("Matings by Elephant Age, poisson model fit")
+
+g + stat_smooth(method = glm,
+              method.args = list(family = "quasipoisson")) +
+  ggtitle("Matings by Elephant Age, quasipoisson model fit")
+```
+
+(d)	Check for nonlinearity in the relationship by using the term poly(Age,2) in a new model. What do you conclude?
+
+```{r}
+eleph.glm2 <- update(eleph.glm, .~. + I(Age^2))
+Anova(eleph.glm2, test = "Wald")
+```
+
+*Adding the quadratic age term does not improve the fit.*
+
+(e)	Assess whether there is any evidence of overdispersion in these data by fitting analogous quasi-Poisson and negative-binomial models.
+
+```{r}
+eleph.glmQ <- glm(Matings~I(Age-27), data = eleph
+                 , family = "quasipoisson")
+eleph.glmQ2 <- update(eleph.glmQ, .~. + I(Age^2))
+
+eleph.glmN <- glm.nb(Matings~I(Age-27), data = eleph)
+eleph.glmN2 <- update(eleph.glmN, .~. + I(Age^2))
+
+anova(eleph.glmQ, eleph.glmQ2, test = "Chisq")
+anova(eleph.glmN, eleph.glmN2, test = "Chisq")
+LRstats(eleph.glm, eleph.glm2
+        , eleph.glmQ, eleph.glmQ2
+        , eleph.glmN, eleph.glmN2
+        , sortby = "BIC")
+```
+
+*BIC prefers the non-quadratic models^2. I'm unsure why LRStats won't estimate for the quasipoisson model. From the anova test, it looks like the quadratic term is only significant in the poisson model, perhaps because the assumption of constant variance is violated.*
+
+## 11.2 
+The data set quine in MASS gives data on absenteeism from schools in rural New South Wales, Australia. 146 children were classified by ethnic background (Eth), age (Age, a factor), Sex, and Learner status (Lrn), and the number of days absent (Days) from school in a particular school year was recorded.
+
+```{r}
+data("quine", package = "MASS")
+```
+
+(a)	Fit the all main-effects model in the Poisson family and examine the tests of these effects using summary() and car::Anova(). Are there any terms that should be dropped according to these tests?
+
+```{r}
+q.glm <- glm(Days~., data = quine, family = "poisson")
+summary(q.glm)
+Anova(q.glm)
+```
+
+*All these coefficients appear to be significant.*
+
+(b)	Re-fit this model as a quasi-Poisson model. Is there evidence of overdispersion? Test for overdispersion formally, using dispersiontest() from AER.
+
+```{r}
+q.glm2 <- update(q.glm, .~., family = "quasipoisson")
+summary(q.glm2)
+phi <- summary(q.glm2)$dispersion
+```
+
+*There is evidence of over dispersion. Fitting the qp has returned a parameter phi which is lower than the var/mean ratio.*
+
+```{r}
+with(quine, c(mean = mean(Days), var = var(Days),
+                ratio = var(Days) / mean(Days), Phi = phi))
+```
+
+*The null hypothesis of poisson variation follows*
+
+```{r}
+dispersiontest(q.glm)
+dispersiontest(q.glm, 2)
+```
+
+*Mean variance plot shows the quasipoisson and neg.bin mean variance curves*
+
+```{r}
+# fittin mean/variance curves
+# include a negbin
+q.nb <- glm.nb(Days~., data = quine)
+th <- q.nb$theta
+q.glm3 <- update(q.glm, .~., family = negative.binomial(th))
+fit.pois <- fitted(q.glm, type = "response")
+fit.qpois <- fitted(q.glm2, type = "response")
+fit.nbin <- fitted(q.glm3, type = "response")
+
+## cutq
+cutq <- function(x, q = 10) {
+  quantile <- cut(x, breaks = quantile(x, probs = (0 : q) / q),
+                  include.lowest = TRUE, labels = 1 : q)
+  quantile
+}
+group <- cutq(fit.pois, q = 10)
+qdat <- aggregate(quine$Days,
+                  list(group),
+                  FUN = function(x) c(mean = mean(x), var = var(x)))
+qdat <- data.frame(qdat$x)
+qdat <- qdat[order(qdat$mean),]
+
+phi <- summary(q.glm2)$dispersion
+qdat$qvar <- phi * qdat$mean
+qdat$nbvar <- qdat$mean + (qdat$mean^2) / th
+
+with(qdat, {
+  plot(var ~ mean, xlab = "Mean number of Days", ylab = "Variance",
+       pch = 16, cex = 1.2, cex.lab = 1.2)
+  abline(h = mean(quine$Days), col = gray(.40), lty = "dotted")
+  lines(mean, qvar, col = "red", lwd = 2)
+  lines(mean, nbvar, col = "blue", lwd = 2)
+  lines(lowess(mean, var), lwd = 2, lty = "dashed")
+  text(10, 25, "Poisson", col = gray(.40))
+  text(30, 300, "quasi-Poisson", col = "red")
+  text(22, 500, "negbin", col = "blue")
+  text(32.5, 600, "lowess")
+})
+```
+
+(c)	Carry out the same significance tests and explain why the results differ from those for the Poisson model.
+
+```{r}
+Anova(q.glm2)
+```
+
+*The coefficients for the quasipoisson are the same but the significance tests give different results. The show the coefficients to be less, or not significant. This is because the standard errors are multiplied $\phi^{-\frac{1}{2}}$. With larger standard errors, the tests for significance require larger residuals to be significant.*
+
+*A quick look at Anova for neg bin model*
+
+```{r}
+Anova(q.glm3)
+```
+
+## 11.3 
+The data set AirCrash in vcdExtra was analyzed in Exercise 5.2 and Exercise 6.3 in relation to the Phase of the flight and Cause of the crash. Additional variables include the number of Fatalities and Year. How does Fatalities depend on the other variables?
+
+```{r}
+data("AirCrash", package = "vcdExtra")
+```
+
+(a)	Use the methods of this chapter to make some exploratory plots relating fatalities to each of the predictors.
+
+```{r, fig.height=4, fig.width=3}
+bwplot(log(Fatalities+1)~Phase, data = AirCrash
+       , varwidth = TRUE
+       , par.settings = MyLatticeTheme
+       , scale = list(x = list(rot = 45)))
+
+bwplot(log(Fatalities+1)~Cause, data = AirCrash
+       , varwidth = TRUE
+       , par.settings = MyLatticeTheme
+       , scale = list(x = list(rot = 45)))
+
+dotplot(log(Fatalities+1)~Year, data = AirCrash
+       , jitter.x = TRUE
+       , horizontal = FALSE
+       , panel = function(x,y, ...) {
+         panel.dotplot(x,y, ...)
+         panel.loess(x, y, family = "symmetric"
+                     , lwd = 3, ...)
+       }
+       , par.settings = MyLatticeTheme
+       , scales = list(x = list(labels = sort(unique(AirCrash$Year))
+                                , rot = 45, cex = 0.4)))
+```
+
+*There is definitely a structured association between Year and the other two predictors, as can be seen in the spinograms:*
+
+```{r, fig.height=4, fig.width=4.5}
+cdplot(Phase~Year, data = AirCrash
+       , xlab = "Year"
+       , main = "Phase by Year Spinogram")
+cdplot(Cause~Year, data = AirCrash
+       , xlab = "Year"
+       , main = "Phase by Year Spinogram")
+```
+
+*Phase and Cause are associated, as can be seen here:*
+
+```{r, fig.height=4, fig.width=9}
+ggplot(AirCrash, aes(x = Cause, y = Fatalities)) +
+  geom_boxplot(outlier.size = 3
+               , aes(fill = Cause)
+               , varwidth = TRUE
+               , alpha = 0.2) +
+  geom_jitter(position = position_jitter(width = 0.2)
+              , alpha = 0.25) +
+  facet_grid(. ~ Phase) +
+  scale_y_log10(breaks = c(1, 2, 5, 10, 20, 50, 100, 200)) +
+  theme(legend.position = "none", axis.text.x  = element_text(angle=90)) +
+  labs(y = "Fatalities (log scale)")
+```
+
+(b)	Fit a main effects poisson regression model for Fatalities, and make effects plots to visualize the model. Which phases and causes result in the largest number of fatalities?
+
+```{r, fig.height=4, fig.width=3}
+ac.glm <- glm(Fatalities~Phase+Cause+Year, data = AirCrash, family = "poisson")
+
+plot(allEffects(ac.glm)[1], band.colors = "blue", lwd = 3,
+     ylab = "Fatalities", rotx = 30
+          , ci.style = "bars")
+plot(allEffects(ac.glm)[2], band.colors = "blue", lwd = 3,
+     ylab = "Fatalities", rotx = 30
+          , ci.style = "bars")
+plot(allEffects(ac.glm)[3], band.colors = "blue", lwd = 3,
+     ylab = "Fatalities"
+          , ci.style = "bands")
+```
+
+*En route and unknown are the Phases that cause the largest number of fatalities. Likewise for criminal and human error Causes.*
+
+(c)	A linear effect of Year might not be appropriate for these data. Try using a natural spline term, ns(Year, df) to achieve a better, more adequate model.
+
+```{r, fig.height=4, fig.width=3}
+ac.glm2 <- glm(Fatalities~Phase+Cause+ns(Year,5), data = AirCrash, family = "poisson")
+anova(ac.glm, ac.glm2)
+
+plot(allEffects(ac.glm2)[1], band.colors = "blue", lwd = 3
+     , ylab = "Fatalities", rotx = 30
+     , ci.style = "bars")
+plot(allEffects(ac.glm2)[2], band.colors = "blue", lwd = 3
+     , ylab = "Fatalities", rotx = 30
+     , ci.style = "bars")
+plot(allEffects(ac.glm2)[3], band.colors = "blue", lwd = 3
+     , ylab = "Fatalities"
+     , ci.style = "bands")
+```
+
+(d)	Use a model-building tool like add1() or MASS::stepAIC() to investigate whether there are important two-way interactions among the factors and your chosen effect for Year.
+
+```{r}
+add1(ac.glm, .~.^2, test = "Chisq")
+add1(ac.glm2, .~.^2, test = "Chisq")
+```
+
+*All these interaction terms seem to be important.*
+
+(e)	Visualize and interpret your final model and write a brief summary to answer the question posed.
+
+```{r, fig.height=4}
+ac.glm3 <- update(ac.glm2, .~. + Phase:Cause + Phase:ns(Year, 5) + Cause:ns(Year, 5))
+
+ac.eff <- allEffects(ac.glm3
+                     , xlevels = list(
+                       Year = c(2005, 2006)))
+plot(ac.eff, "Phase:Cause"
+      , multiline = TRUE
+      , type = "response"
+     , ci.style = "none"
+      , par.settings = MyLatticeTheme)
+
+plot(ac.eff, "Phase:ns(Year,5)"
+      , multiline = TRUE
+      , type = "response"
+      , par.settings = MyLatticeTheme
+     )
+
+plot(ac.eff, "Cause:ns(Year,5)"
+      , multiline = TRUE
+      , type = "response"
+      , par.settings = MyLatticeTheme
+     )
+```
+
+```{r, fig.height=4, fig.width=3}
+residualPlot(ac.glm2, type = "rstudent", groups = AirCrash$Cause)
+residualPlot(ac.glm2, type = "rstudent", groups = AirCrash$Phase)
+influencePlot(ac.glm)
+```
+
+## 11.4 
+Male double-crested cormorants use advertising behavior to attract females for breeding. The Cormorants data set in vcdExtra gives some results from a study by Meagan Mc Rae (2015) on counts of advertising males observed two or three times a week at six stations in a tree-nesting colony for an entire breeding season. The number of advertising birds was counted and these observations were classified by characteristics of the trees and nests. The goal was to determine how this behavior varies temporally over the season and spatially over observation stations, as well as with characteristics of nesting sites. The response variable is count and other predictors are shown below. See help(Cormorants, package="vcdExtra") for further details.
+
+```{r}
+set.seed(123)
+data("Cormorants", package = "vcdExtra")
+some(Cormorants)
+nac <- is.na(Cormorants$category)
+Cormorants$category[nac] <- "Chicks Present"
+with(Cormorants, {
+  pre <<- range(week[category == "Pre"])
+  inc <<- range(week[category == "Incubation"])
+  chick <<- range(week[category == "Chicks Present"])
+})
+
+```
+
+(a) Using the methods illustrated in this chapter, make some exploratory plots of the number of advertising birds against week in the breeding season, perhaps stratified by another predictor, like tree height, nest condition, or observation station. To see anything reasonable, you should plot count on a log (or square root) scale, jitter the points, and add smoothed curves. The variable category breaks the weeks into portions of the breeding season, so adding vertical lines separating those will be helpful for interpretation.
+
+```{r}
+barplot(table(Cormorants$count), ylab = "log(count)"
+        , xlab = "Count of Cormorants", col = "lightblue"
+        , log = "y"
+        , main = "Frequency of Cormorants count")
+abline(v = mean(Cormorants$count), col = "red", lwd = 3)
+ci <- mean(Cormorants$count) + c(-1, 1) * sd(Cormorants$count)
+lines(x = ci, y = c(0.9, 0.9), col = "red", lwd = 3, xpd = TRUE)
+exploraplot <- function(fmla) {
+  xyplot(fmla, data = Cormorants
+       , jitter.x = TRUE, jitter.y = TRUE
+       , panel = function(x, y, ...) {
+         panel.xyplot(x, y, pch = 1, ...)
+         panel.abline(v = c(pre[2], inc[2]) + 0.5)
+         panel.loess(x, y, span = 7/11, degree = 0
+                     , col = "magenta", lwd = 2, ...)
+       }
+       , scales = list(
+         y = list(log = TRUE)
+        )
+       , par.settings = MyLatticeTheme)
+}
+
+fmlas <- paste("jitter(count, amount = 0.25)~week |",names(Cormorants)[3:7])
+for (f in fmlas) {
+  trel <- exploraplot(as.formula(f))
+  print(trel)
+}
+```
+
+(b)	Fit a main-effects Poisson GLM to these data and test the terms using Anova() from the car package.
+
+```{r}
+cor.glm <- glm(count~., data = Cormorants, family = poisson)
+summary(cor.glm)
+Anova(cor.glm)
+```
+
+(c)	Interpret this model using an effects plot.
+
+```{r}
+cor.eff <- allEffects(cor.glm)
+plot(cor.eff[1:2], band.colors = "blue")
+plot(cor.eff[3:4], band.colors = "blue")
+plot(cor.eff[5:6], band.colors = "blue")
+```
+
+*tree_health has no effect and is not shown.*
+
+(d)	Investigate whether the effect of week should be treated as linear in the model. You could try using a polynomial term like poly(week, degree) or perhaps better, using a natural spline term like ns(week, df) from the splines package.
+
+```{r}
+cor.glm_p <- update(cor.glm, .~.-week+poly(week,3))
+cor.glm_ns <- update(cor.glm, .~.-week+ns(week,3))
+LRstats(cor.glm, cor.glm_p, cor.glm_ns)
+```
+
+*These are not significantly different.*
+
+(e)	Test this model for overdispersion, using either a quasipoisson family or dispersiontest() in AER.
+
+```{r}
+dispersiontest(cor.glm)
+dispersiontest(cor.glm, 2)
+dispersiontest(cor.glm_ns)
+dispersiontest(cor.glm_ns, 2)
+```
+
+*Annoyingly, test 1 fails and test 2 indicates overdispersion.*
+
+*I will also try with a quasipoisson fit.*
+
+```{r}
+sum(residuals(cor.glm, type = "pearson")^2)/cor.glm$df.residual
+
+sum(residuals(cor.glm_ns, type = "pearson")^2)/cor.glm_ns$df.residual
+
+cor.glm_qp <- update(cor.glm, family = quasipoisson)
+summary(cor.glm_qp)$dispersion
+
+cor.glm.qp <- update(cor.glm_ns, family = quasipoisson)
+summary(cor.glm.qp)$dispersion
+```
+
+## 11.5 
+For the CodParasites data, recode the area variable as an ordered factor as suggested in footnote 13. Test the hypotheses that prevalence and intensity of cod parasites is linearly related to area.
+
+```{r}
+data("CodParasites", package = "countreg")
+CodParasites <- CodParasites[complete.cases(CodParasites),]
+CodParasites <- within(CodParasites, {
+  area.ord <- ordered(area, c("soroya", "mageroya", "tanafjord", "varangerfjord"))
+  weight.f <- equal.count(weight,4)
+  depth.f <- equal.count(depth,4)
+  age.f <- equal.count(age,4)
+})
+```
+
+*I begin by refitting some of the models in the worked example.*
+
+```{r}
+cp_p  <- glm(intensity ~ length + area * year,
+             data = CodParasites, family = poisson)
+cp_nb <- glm.nb(intensity ~ length + area * year,
+                data = CodParasites)
+
+cp_hp  <- hurdle(intensity ~ length + area * year,
+                 data = CodParasites, dist = "poisson")
+cp_hnb <- hurdle(intensity ~ length + area * year,
+                 data = CodParasites, dist = "negbin")
+cp_zip <- zeroinfl(intensity ~ length + area * year,
+                   data = CodParasites, dist = "poisson")
+cp_znb <- zeroinfl(intensity ~ length + area * year,
+                   data = CodParasites, dist = "negbin")
+cat("have to use LRStats as the only measures can compare are AIC and BIC")
+
+LRstats(cp_p, cp_nb, cp_hp, cp_hnb, cp_zip, cp_znb, sortby = "BIC")
+cat("nb much improves over poisson")
+
+vuong(cp_nb, cp_hnb)     # nb vs. hurdle nb
+vuong(cp_hnb, cp_znb)    # hurdle nb vs znb
+cat("hurdle comes out on top")
+
+summary(cp_hnb)
+cat("length not significant in the zero model, can remove it")
+cp_hnb1 <- hurdle(intensity ~ length + area * year | area * year,
+                  data = CodParasites, dist = "negbin")
+```
+
+*I fit a nother model with my ordinal version of the area variable, adding it as a score parameter.*
+
+```{r}
+area.score  <- as.numeric(CodParasites$area.ord)
+cp_hnb1.ord <- hurdle(intensity ~ length + area.score * year | area.score * year,
+                  data = CodParasites, dist = "negbin")
+
+vuong(cp_hnb1, cp_hnb1.ord)
+```
+
+*vuong's test finds model 1 more significant! I wasn't expecting that.*
+
+## 11.6 
+In Example 11.10, we ignored other potential predictors in the CodParasites data: depth, weight, length, sex, stage, and age. Use some of the graphical methods shown in this case study to assess whether any of these are related to prevalence and intensity.
+
+```{r, fig.height=4, fig.width=3}
+g <- ggplot(data = CodParasites, aes(y = as.numeric(prevalence) -1)) +
+  geom_jitter(position = position_jitter(height = 0.5), alpha = 0.5) +
+  geom_rug(position = "jitter", sides = "b") +
+  stat_smooth(method = "loess", colour = "red", fill = "red", size = 1.5) +
+  labs(y = "prevalence")
+
+g + aes(x = depth)
+g + aes(x = weight)
+g + aes(x = age)
+```
+
+*There may be some lower incidence of prevalence in specimens younger than 5 years and also from the shallowest depths. The confidence interval around the extremity of weight means that it's probably more to do with a lack of data on the heaviest fish than a real pattern.*
+
+```{r, fig.height=4, fig.width=4.5}
+bwplot(log(intensity+1)~sex, data = CodParasites
+       , varwidth = TRUE
+       , par.settings = MyLatticeTheme)
+
+bwplot(log(intensity+1)~stage, data = CodParasites
+       , varwidth = TRUE
+       , par.settings = MyLatticeTheme)
+```
+
+```{r, fig.height=4, fig.width=4.5}
+bwplot(log(intensity+1)~age, data = CodParasites
+       , jitter.x = TRUE
+       , horizontal = FALSE
+       , panel = function(x,y, ...) {
+         panel.dotplot(x,y, ...)
+         panel.loess(x, y, family = "symmetric"
+                     , lwd = 3, ...)
+       }
+       , par.settings = MyLatticeTheme
+       , main = "Intensity of cod parasite infections, all specimens")
+
+bwplot(log(intensity+1)~age, data = CodParasites[CodParasites$prevalence == "yes",]
+       , jitter.x = TRUE
+       , horizontal = FALSE
+       , panel = function(x,y, ...) {
+         panel.dotplot(x,y, ...)
+         panel.loess(x, y, family = "symmetric"
+                     , lwd = 3, ...)
+       }
+       , par.settings = MyLatticeTheme
+       , main = "Intensity of cod parasite infections, where detected")
+```
+
+*There is an important pattern involving depth and a bit of a pattern involving age.*
+
+```{r, fig.width=9}
+bwplot(log(intensity+1)~area.ord | age.f + depth.f, data = CodParasites
+      , varwidth = TRUE
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , scale = list(x = list(rot = 40)))
+```
+
+*The double decker allows for joint independence sex and stage.*
+
+```{r}
+cp.tab <- xtabs(~ sex + stage + factor(is.na(prevalence) |
+                                         prevalence == "yes"),
+                data = CodParasites)
+dimnames(cp.tab)[3] <- list(c("No", "Yes"))
+names(dimnames(cp.tab))[3] <- "prevalence"
+
+doubledecker(prevalence ~ sex + stage, data = cp.tab,
+             gp = shading_hcl
+             , expected = ~ sex:stage + prevalence,
+             margins = c(1, 5, 3, 1))
+```
+
+```{r}
+cp_hnb2 <- hurdle(formula = intensity ~ length + area*year + age*depth + stage | area*year + age*depth + stage, 
+    data = CodParasites, dist = "negbin")
+
+summary(cp_hnb2)
+
+vuong(cp_hnb1, cp_hnb2)
+LRstats(cp_hnb1, cp_hnb2)
+```
+
+*The new model appears to be a bit of an improvement.*
+
+```{r}
+cp_hnb3 <- hurdle(formula = intensity ~ length + area*year | area*year + depth
+                  , data = CodParasites, dist = "negbin")
+
+summary(cp_hnb3)
+
+vuong(cp_hnb1, cp_hnb3)
+vuong(cp_hnb2, cp_hnb3)
+LRstats(cp_hnb1, cp_hnb2, cp_hnb3)
+```
+
+*Generally model 3 favoured. It has more df.*
+
+```{r, fig.width=4.5}
+cp.year <- unique(CodParasites$year)
+cp.area <- unique(CodParasites$area)
+depth.rng <- range(CodParasites$depth)
+cp.depth <- seq(depth.rng[1],depth.rng[2],40)
+length.rng <- range(CodParasites$length)
+cp.length <- seq(length.rng[1], length.rng[2], 16)
+cp.grid <- data.frame(expand.grid(year = factor(cp.year)
+                                  , area = factor(cp.area)
+                                  , depth = cp.depth
+                                  , length = cp.length))
+cp.grid$pred <- predict(cp_hnb3, cp.grid)
+
+bwplot(log(pred)~area, groups = year, data = cp.grid
+       , panel = function(x, y, groups, subscripts, ...) {
+           panel.grid(h = -1, v = 0)
+           panel.stripplot(x, y, ..., jitter.data = TRUE, alpha = 0.3
+                           , groups = groups, subscripts = subscripts)
+           panel.superpose(x, y, ..., panel.groups = panel.average
+                           , lwd = 2, lty = 1, alpha = 0.75
+                           , groups = groups, subscripts = subscripts)
+       }
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key = list(points = FALSE, lines = TRUE, columns = 2)
+)
+
+bwplot(log(pred)~year, groups = area, data = cp.grid
+       , panel = function(x, y, groups, subscripts, ...) {
+           panel.grid(h = -1, v = 0)
+           panel.stripplot(x, y, ..., jitter.data = TRUE, alpha = 0.3
+                           , groups = groups, subscripts = subscripts)
+           panel.superpose(x, y, ..., panel.groups = panel.average
+                           , lwd = 2, lty = 1, alpha = 0.75
+                           , groups = groups, subscripts = subscripts)
+       }
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key = list(points = FALSE, lines = TRUE, columns = 2)
+)
+
+xyplot(log(pred) ~ depth | year, groups = area, cp.grid
+      , panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.xyplot(x, y, ..., jitter.x = TRUE, alpha = 0.3
+                         , groups = groups, subscripts = subscripts)
+         panel.superpose(x, y, ..., panel.groups = panel.loess
+                         , lwd = 2, lty = 1, alpha = 0.75
+                         , groups = groups, subscripts = subscripts)
+      }
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key = list(points = FALSE, lines = TRUE, columns = 2)
+)
+
+xyplot(log(pred) ~ depth | area, groups = year, cp.grid
+      , panel = function(x, y, groups, subscripts, ...) {
+         panel.grid(h = -1, v = 0)
+         panel.xyplot(x, y, ..., jitter.x = TRUE, alpha = 0.3
+                         , groups = groups, subscripts = subscripts)
+         panel.superpose(x, y, ..., panel.groups = panel.loess
+                         , lwd = 2, lty = 1, alpha = 0.75
+                         , groups = groups, subscripts = subscripts)
+      }
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key = list(points = FALSE, lines = TRUE, columns = 2)
+)
+```
+
+```{r, fig.width=9}
+library("RColorBrewer")
+brewer.div <- colorRampPalette(brewer.pal(11, "Spectral"),
+                               interpolate = "spline")
+
+MyLatticeTheme$axis.line = list(col = "transparent")
+wireframe(log(pred) ~ depth * length | area + year, cp.grid
+          , drape = TRUE
+          , col.regions = colorRampPalette(c("lightblue", "hotpink"))(100)
+          , aspect = c(61/87, 0.5)
+          , zlab = NULL
+          , par.settings = MyLatticeTheme
+          , strip = MyLatticeStrip)
+```
+
+# 11.7 
+The analysis of the PhdPubs data in the examples in this chapter were purposely left incomplete, going only as far as the negative binomial model.
+
+(a)	Fit the zero-inflated and hurdle models to this data set, considering whether the count component should be Poisson or negative-binomial, and whether the zero model should use all predictors or only a subset. Describe your conclusions from this analysis in a few sentences.
+
+```{r}
+phd.qpois <- glm(articles ~ .
+                 , data = PhdPubs
+                 , family = quasipoisson)
+(phi <- summary(phd.qpois)$dispersion)
+```
+
+*There is overdispersion, so I'll use the neg.bin.*
+
+```{r}
+phd.hnb <- countreg::hurdle(articles ~ ., data = PhdPubs, dist = "negbin")
+phd.znb <- countreg::zeroinfl(articles ~ ., data = PhdPubs, dist = "negbin")
+
+LRstats(phd.hnb, phd.znb)
+vuong(phd.hnb, phd.znb)
+```
+
+*LRstats and vuong are inconclusive but hedge towards the zero inflated.*
+
+```{r}
+summary(phd.znb)
+```
+
+*Only mentor is significant in the zero model. married and prestige look like they don't add to the count model. Interestingly the estimate of theta is no longer dispersed when zeros are modelled separately. I'll fit three new models, one on the negbin and one on the poisson and one on the geometric (negbin theta = 1), with these parameter choices.*
+
+```{r}
+phd.znb2 <- zeroinfl(articles ~ female + kid5 + mentor |
+                      mentor
+                    , data = PhdPubs, dist = "negbin")
+phd.zge <- zeroinfl(articles ~ female + kid5 + mentor |
+                      mentor
+                    , data = PhdPubs, dist = "geometric")
+phd.zp <- zeroinfl(articles ~ female + kid5 + mentor |
+                      mentor
+                    , data = PhdPubs, dist = "poisson")
+
+LRstats(phd.znb, phd.znb2, phd.zge, phd.zp)
+vuong(phd.znb, phd.znb2)
+vuong(phd.zge, phd.znb2)
+vuong(phd.zp, phd.znb2)
+
+countreg::rootogram(phd.znb, main = "Negative Binomial")
+countreg::rootogram(phd.zge, main = "Geometric")
+countreg::rootogram(phd.zp, main = "ZI Poisson")
+countreg::rootogram(phd.znb2, main = "ZI Negative Binomial, reduced params")
+```
+
+*Definitely the reduced negbin model is best.*
+
+(b)	Using the methods illustrated in this chapter, create some graphs summarizing the predicted counts and probabilities of zero counts for one of these models.
+
+```{r, fig.width=3}
+spineplot(factor(articles == 0) ~ female, ylevels = 2:1
+     , data = PhdPubs, ylab = "No published articles")
+
+cdplot(factor(articles == 0) ~ kid5, ylevels = 2:1
+     , data = PhdPubs, ylab = "No published articles")
+
+cdplot(factor(articles == 0) ~ mentor, ylevels = 2:1
+     , data = PhdPubs, ylab = "No published articles")
+```
+
+(c)	For your chosen model, use some of the diagnostic plots of residuals and other measures shown in Section 11.6 to determine if your model solves any of the problems noted in Example 11.17 and Example 11.18, and whether there are any problems that remain.
+
+```{r}
+studentResids <- function(x) {
+  stu.mat <- matrix(x, nrow = length(x), ncol = length(x))
+  stu.mat[row(stu.mat) == col(stu.mat)] <- NA
+  stu.mat <- apply(stu.mat, 2, sd, na.rm = TRUE)
+  x/stu.mat
+}
+
+PhdPubs$res <- phd.znb2$residuals
+PhdPubs$rstu <- studentResids(phd.znb2$residuals)
+PhdPubs$rsta <- phd.znb2$residuals/ sd(phd.znb2$residuals)
+PhdPubs$fit <- phd.znb2$fitted.values
+
+plot(density(PhdPubs$rsta), lwd = 2, col = "blue",
+     main = "Density of residuals")
+rug(PhdPubs$rsta)
+
+xyplot(rstu~jitter(log(articles + 1), factor = 3), data = PhdPubs
+       , alpha = 0.3
+      , xlab = "log (articles + 1)", ylab = "Studentized residual"
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip)
+
+```
+
+*Have reduced the bimodality*
+
+```{r}
+MyLatticeTheme$superpose.symbol$pch <- c(8,11)
+xyplot(res~jitter(log(fit), factor = 3), groups = female, data = PhdPubs
+      , panel = function(x, y, groups, subscripts, ...) {
+        panel.grid(h = -1, v = -1)
+        panel.superpose(x, y, ..., panel.groups = panel.xyplot
+                         , lwd = 2, lty = 1, alpha = 0.4
+                         , groups = groups, subscripts = subscripts)
+        panel.loess(x, y, ... , lwd = 3
+               , groups = groups, subscripts = subscripts)
+      }
+      , xlab = "log (articles + 1)", ylab = "Residual"
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key=list(space="top", columns=2, 
+                       points=TRUE
+                      , text = c("male", "female")))
+```
+
+*Have reduced the size of residuals in the zero articles.*
+
+```{r}
+xyplot(rstu~mentor, groups = female, data = PhdPubs
+      , panel = function(x, y, groups, subscripts, ...) {
+        panel.grid(h = -1, v = -1)
+        panel.superpose(x, y, ..., panel.groups = panel.xyplot
+                         , lwd = 2, lty = 1, alpha = 0.4
+                         , groups = groups, subscripts = subscripts)
+        panel.loess(x, y, ... , lwd = 3
+               , groups = groups, subscripts = subscripts)
+      }
+      , xlab = "mentor", ylab = "Studentized Residual"
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key=list(space="top", columns=2, 
+                       points=TRUE
+                      , text = c("male", "female")))
+```
+
+```{r}
+xyplot(rstu~phdprestige, groups = female, data = PhdPubs
+      , panel = function(x, y, groups, subscripts, ...) {
+        panel.grid(h = -1, v = -1)
+        panel.superpose(x, y, ..., panel.groups = panel.xyplot
+                         , lwd = 2, lty = 1, alpha = 0.4
+                         , groups = groups, subscripts = subscripts)
+        panel.loess(x, y, ... , lwd = 3
+               , groups = groups, subscripts = subscripts)
+      }
+      , xlab = "phdprestige", ylab = "Studentized Residual"
+      , par.settings = MyLatticeTheme
+      , strip = MyLatticeStrip
+      , auto.key=list(space="top", columns=2, 
+                       points=TRUE
+                      , text = c("male", "female")))
+```
+

@@ -1,0 +1,405 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r setup}
+require(vcd)
+require(vcdExtra)
+require(gnm)
+require(logmult)
+```
+
+---
+title: "VCD 10 Exercises"
+author: "Julian Hatwell"
+date: "3 April 2016"
+output: html_document
+---
+
+## 10.1 
+Example 10.5 presented an analysis of the data on visual acuity for the subset of women in the VisualAcuity data. Carry out a parallel analysis of the models fit there for the men in this data set, given by: 
+
+```{r, echo=TRUE}
+data("VisualAcuity", package="vcd")
+men <- subset(VisualAcuity, gender=="male", select=-gender)
+```
+
+```{r}
+# display func
+show.or <- function(x) {
+  or <- matrix(exp(coef(x))[2:7], 3,2)
+  dimnames(or) <- list(acuity = c("2", "3", "4")
+                       , side = c("right", "left"))
+  or  
+}
+
+# independence model
+indep <- glm(Freq ~ right + left,  data = men
+             , family = poisson)
+cat("Independence model OR")
+show.or(indep)
+
+# quasi indep - allow for identity association
+quasi <- update(indep, . ~ . + Diag(right, left))
+cat("Quasi Independence model OR")
+show.or(quasi)
+
+# symmetry model - allow for symmetry either side of diag
+symm <- glm(Freq ~ Symm(right, left), data = men, family = poisson)
+cat("Symmetry model OR")
+show.or(symm)
+
+# 
+qsymm <- update(symm, . ~ right + left + .)
+cat("Quasi Symmetry model OR")
+show.or(qsymm)
+
+LRstats(indep, quasi, symm, qsymm)
+
+labs <- c("High", "2", "3", "Low")
+
+largs <- list(set_varnames = c(right = "Right eye grade",
+                               left = "Left eye grade"),
+              set_labels=list(right = labs, left = labs))
+
+mosaic(indep, ~ right + left, residuals_type = "rstandard",
+       gp = shading_Friendly,
+       labeling_args = largs,
+       main = "Independence (men)")
+
+mosaic(quasi, ~ right + left, residuals_type = "rstandard",
+       gp = shading_Friendly,
+       labeling_args = largs,
+       main = "Quasi-Independence (men)")
+
+mosaic(symm, ~ right + left, residuals_type = "rstandard",
+       gp = shading_Friendly,
+       labeling_args = largs,
+       main = "Quasi-Symmetry (men)")
+
+mosaic(qsymm, ~ right + left, residuals_type = "rstandard",
+       gp = shading_Friendly,
+       labeling_args = largs,
+       main = "Quasi-Symmetry (men)")
+```
+
+*It can be seen that the non-diagonal associations are largely symmetric, and also that when they differ, visual acuity is likely to be inferior in the right eye.*
+
+## 10.2 
+Table 10.2 gives a 4 × 4 table of opinions about premarital sex and whether methods of birth control should be made available to teenagers aged 14–16, from the 1991 General Social Survey (Agresti, 2013, Table 10.3). Both variables are ordinal, and their grades are represented by the case of the row and column labels.
+
+```{r}
+freqs <- c(81,24,18,36,68,26,41,57,60,29,74,161,38,14,42,157)
+premat.tab <- matrix(freqs, 4,4)
+dimnames(premat.tab) <- list(Premarital.Sex = c("WRONG", "Wrong", "wrong", "OK"), Birth.Control = c("DISAGREE", "disagree", "agree", "AGREE"))
+premat.tab
+premat <- data.frame(as.table(premat.tab))
+```
+
+(a)	Fit the independence model to these data using loglm() or glm().
+
+```{r}
+indep <- glm(Freq~Premarital.Sex + Birth.Control
+             , premat, family = poisson)
+```
+
+(b)	Make a mosaic display showing departure from independence and describe verbally the pattern of association.
+
+```{r}
+largs <- list(
+  set_varnames = c(Premarital.Sex = "Opinion of pre marital sex"
+                   , Birth.Control = "Opinion on birth control for teens"))
+
+mosaic(indep, ~Premarital.Sex + Birth.Control
+       , residuals_type = "rstandard"
+       , gp = shading_Friendly
+       , labeling_args = largs
+       , rot_labels = c(0,0,0,0)
+       , offset_labels = c(0,0,0,1)
+       , offset_varnames = c(0,0,0,2.25)
+       , main = "Independence")
+```
+
+*There is a strong opposite corner pattern, indicating a uniform association between responses to the two questions.*
+
+(c)	Treating the categories as equally spaced, fit the L × L model of uniform association, as in Section 10.1. Test the difference against the independence model with a likelihood-ratio test.
+
+```{r}
+Rscore <- as.numeric(premat$Premarital.Sex)
+Cscore <- as.numeric(premat$Birth.Control)
+
+# adding the row and column scores to the model
+linlin <- update(indep, . ~ . + Rscore:Cscore)
+LRstats(indep, linlin)
+anova(indep, linlin)
+```
+
+(d)	Fit the RC(1) model with gnm(), and test the difference of this against the model of uniform association.
+
+*I'm fitting an RC(2) model as well out of curiosity.*
+
+```{r}
+# set up for nonlin
+contrasts(premat$Premarital.Sex) <- contr.treatment
+contrasts(premat$Birth.Control) <- contr.treatment
+
+# refit with gnm
+indep <- gnm(Freq ~ Premarital.Sex + Birth.Control
+             , data = premat, family = poisson)
+RC1 <- update(indep, . ~ . + Mult(Premarital.Sex, Birth.Control), verbose = FALSE)
+
+RC2 <- update(indep, . ~ . + instances(Mult(Premarital.Sex
+                                            , Birth.Control), 2)
+              , verbose = FALSE)
+
+LRstats(linlin, RC1, RC2)
+anova(linlin, RC1, RC2, test = "Chisq")
+```
+
+(e)	Write a brief summary of these results, including plots useful for explaining the relationships in this data set.
+
+*The LxL model appears is preferred even though it has a slightly higher LR. It is favoured by AIC and BIC because it has fewer parameters. RC2 looks like a very close fit, from the Resid.Dev*
+
+*Comparing mosaic plots*
+
+```{r}
+mosaic(linlin, ~Premarital.Sex + Birth.Control
+       , residuals_type = "rstandard"
+       , gp = shading_Friendly
+       , labeling_args = largs
+       , rot_labels = c(0,0,0,0)
+       , offset_labels = c(0,0,0,1)
+       , offset_varnames = c(0,0,0,2.25)
+       , main = "Uniform Association")
+
+mosaic(RC1, ~Premarital.Sex + Birth.Control
+       , residuals_type = "rstandard"
+       , gp = shading_Friendly
+       , labeling_args = largs
+       , rot_labels = c(0,0,0,0)
+       , offset_labels = c(0,0,0,1)
+       , offset_varnames = c(0,0,0,2.25)
+       , main = "RC1")
+
+mosaic(RC2, ~Premarital.Sex + Birth.Control
+       , residuals_type = "rstandard"
+       , gp = shading_Friendly
+       , labeling_args = largs
+       , rot_labels = c(0,0,0,0)
+       , offset_labels = c(0,0,0,1)
+       , offset_varnames = c(0,0,0,2.25)
+       , main = "RC2")
+```
+
+*Plotting derived scores*
+
+```{r}
+rowProbs <- with(premat, tapply(Freq, Premarital.Sex, sum) / sum(Freq))
+colProbs <- with(premat, tapply(Freq, Birth.Control, sum) / sum(Freq))
+
+alpha <- getContrasts(RC1, pickCoef(RC1, "[.]Premarital.Sex"),
+                   ref = rowProbs, scaleWeights = rowProbs)$qvframe
+beta <- getContrasts(RC1, pickCoef(RC1, "[.]Birth.Control"),
+                   ref = colProbs, scaleWeights = colProbs)$qvframe
+
+scores <- rbind(alpha, beta)
+scores <- cbind(scores,
+                factor = c(rep("Premarital.Sex", 4), rep("Birth.Control", 4)) )
+rownames(scores) <- c(levels(premat$Premarital.Sex), levels(premat$Birth.Control))
+scores$lower <- scores[,1] - scores[,2]
+scores$upper <- scores[,1] + scores[,2]
+
+op <- par(mar=c(5, 4, 1, 1) + .1)
+
+with(scores, {
+  dotchart(Estimate, groups = factor, labels = rownames(scores),
+           cex = 1.2, pch = 16, xlab = "RC1 Score",
+           xlim = c(min(lower), max(upper)))
+  arrows(lower, c(1:4,6+(1:4)), upper, c(1:4, 6+(1:4)),
+         col = "red", angle = 90, length = .05, code = 3, lwd = 2)
+})
+par(op)
+```
+
+*Plotting odds ratios*
+
+```{r}
+# prettier plot generated above
+# rc1 <- rc(premat.tab, verbose = FALSE, weighting = "marginal", se = "jackknife")
+
+# coords  <- plot(rc1, conf.ellipses = 0.68, cex = 1.5,      rev.axes = c(TRUE, FALSE))
+
+rc2 <- rc(premat.tab, verbose = FALSE, weighting = "marginal", nd = 2,
+          se = "jackknife")
+
+coords  <- plot(rc2, conf.ellipses = 0.68, cex = 1.5,
+                rev.axes = c(TRUE, FALSE))
+
+scores <- rbind(coords$row, coords$col)
+lines(scores[1 : 4,], col = "blue", lwd = 2)
+lines(scores[-(1 : 4),], col = "red", lwd = 2)
+```
+
+*There may be a case for collapsing the two strongest disgreement categories for premarital sex, "WRONG" and "Wrong."
+
+## 10.3 
+For the data on attitudes toward birth control in Table 10.2,
+
+(a)	Calculate and plot the observed local log odds ratios.
+
+```{r}
+(lor.premat <- loddsratio(premat.tab))
+plot(lor.premat, confidence = FALSE
+     , legend_pos = "topleft"
+     , xlab = "Attitude to premarital sex")
+```
+
+(b)	Also fit the R, C, and R+C models.
+
+```{r}
+indep <- glm(Freq~Premarital.Sex + Birth.Control
+             , premat, family = poisson)
+roweff <- update(indep, . ~ . + Premarital.Sex:Cscore)
+coleff <- update(indep, . ~ . + Rscore:Birth.Control)
+rowcol <- update(indep, . ~ . + Rscore:Birth.Control + Premarital.Sex:Cscore)
+
+LRstats(indep, linlin, roweff, coleff, rowcol)
+# note the C and R when solo cannot be nested
+anova(indep, linlin, roweff, test = "Chisq")
+anova(indep, linlin, coleff, test = "Chisq")
+```
+
+(c)	Use the method described in Section 10.1.2 to visualize the structure of fitted local log odds ratios implied by each of these models, together with the RC(1) model.
+
+```{r}
+# plot the fitted odds ratios to view the model structure
+linlin.fit <- matrix(fitted(linlin), 4, 4, 
+                     dimnames=dimnames(premat.tab))
+cat("Uniform Association (L*L) model odds ratio matrix")
+round(as.matrix(loddsratio(linlin.fit)), 3)
+
+roweff.fit <- matrix(fitted(roweff), 4, 4, 
+                     dimnames=dimnames(premat.tab))
+cat("Row effects (R) model odds ratio matrix")
+round(as.matrix(loddsratio(roweff.fit)), 3)
+
+coleff.fit <- matrix(fitted(coleff), 4, 4, 
+                     dimnames = dimnames(premat.tab))
+cat("Column effects (C) model odds ratio matrix")
+round(as.matrix(loddsratio(coleff.fit)), 3)
+
+rowcol.fit <- matrix(fitted(rowcol), 4, 4, dimnames = dimnames(premat.tab))
+cat("Row plus Column effects (R+C) model odds ratio matrix")
+round(as.matrix(loddsratio(rowcol.fit)), 3)
+
+plot(t(loddsratio(linlin.fit)), confidence = FALSE, 
+     legend_pos="bottomright"
+     , ylim = c(0, .5)
+     , main = "log odds ratios for attitudes, L*L model")
+
+plot(t(loddsratio(roweff.fit)), confidence = FALSE, 
+     legend_pos="bottomright"
+     , ylim = c(0, .5)
+     , main = "log odds ratios for attitudes, R model")
+
+plot(t(loddsratio(coleff.fit)), confidence = FALSE, 
+     legend_pos = "bottomleft"
+     , ylim = c(0, .5)
+     , main="log odds ratios for attitudes, C model")
+
+plot(t(loddsratio(rowcol.fit)), confidence = FALSE, 
+     legend_pos = "bottomright"
+     , ylim = c(0, .5)
+     , main = "log odds ratios for attitudes, R+C model")
+
+```
+
+## 10.4 
+The data set gss8590 in logmult gives a 4 × 5 × 4 table of education levels and occupational categories for the four combinations of gender and race from the General Social Surveys, 1985–1990, as reported by Wong (2001, Table 2). Wong (2010, Table 2.3B) later used the subset pertaining to women to illustrate RC(2) models. This data is created below as Women.tab, correcting an inconsistency to conform with the 2010 table.
+
+```{r}
+data("gss8590", package = "logmult")
+
+women.tab <- margin.table(gss8590[,,c("White Women", "Black Women")], 1:2)
+women.tab[2,4] <- 49
+colnames(women.tab)[5] <- "Farm"
+# women.tab <- women.tab[,1:4]
+```
+
+(a)	Fit the independence model, and also the RC(1) and RC(2) models using rc() with marginal weights, as illustrated in Example 10.4. Summarize these statistical tests in a table.
+
+```{r}
+women <- data.frame(as.table(women.tab))
+# set up for nonlin
+contrasts(women$Education) <- contr.treatment
+contrasts(women$Occupation) <- contr.treatment
+
+indep <- gnm(Freq ~ Education + Occupation
+             , data = women, family = poisson)
+RC1 <- update(indep, . ~ . + Mult(Education, Occupation), verbose = FALSE)
+RC2 <- update(indep, . ~ . + instances(Mult(Education, Occupation), 2)
+              , verbose = FALSE)
+
+cat("Fits with gnm")
+LRstats(indep, RC1, RC2)
+anova(indep, RC1, RC2, test = "Chisq")
+
+rc1 <- rc(women.tab, verbose = FALSE, weighting = "marginal", se = "jackknife")
+
+rc2 <- rc(women.tab, verbose = FALSE, weighting = "marginal", nd = 2, se = "jackknife")
+
+cat("Fits with logmult::rc")
+LRstats(indep, rc1, rc2)
+anova(indep, rc1, rc2, test = "Chisq")
+```
+
+(b)	Plot the solution for the RC(2) model with 68% confidence ellipses. What verbal labels would you use for the two dimensions?
+
+```{r}
+plot(rc1, main = "Category scores for RC1")
+
+coords  <- plot(rc2, conf.ellipses = 0.68
+                , main = "Category scores for RC1")
+scores <- rbind(coords$row, coords$col)
+lines(scores[1 : 4,], col = "blue", lwd = 2)
+lines(scores[-(1 : 4),], col = "red", lwd = 2)
+```
+
+*We might propose dimension 1 as social class or likely income (education and occupation) and dimenstion 2 is a measure of marginal frequency.*
+
+(c)	Is there any indication that a simpler model, using integer scores for the row (Education) or column (Occupation) categories, or both, might suffice? If so, fit the analogous column effects, row effects, or L × L model, and compare with the models fit in part (a).
+
+*There is unlikely to be a better linear fit because the presence of the Farm category really throws out the pattern. Even with the Farm category, there is a certain unevenness between some of the categories. This can also be seen in a mosaic plot.*
+
+```{r}
+mosaic(indep, ~ Education + Occupation
+       , residuals_type = "rstandard"
+       , gp = shading_Friendly
+       , rot_labels = c(90,0,0,0)
+       , offset_varnames = c(0.5,0,0,0.5)
+       , main = "Women")
+```
+
+*The mosaic shows a typical opposite corner pattern, although the tiny "Farm" category bucks the trend and there is some uneven distribution at the "UM"" and "Some college categories".*
+
+```{r}
+Rscore <- as.numeric(women$Education)
+Cscore <- as.numeric(women$Occupation)
+
+indep <- glm(Freq ~ Education + Occupation
+             , women, family = poisson)
+linlin <- update(indep, . ~ . + Rscore:Cscore)
+roweff <- update(indep, . ~ . + Education:Cscore)
+coleff <- update(indep, . ~ . + Rscore:Occupation)
+rowcol <- update(indep, . ~ . + Rscore:Occupation + Education:Cscore)
+
+LRstats(indep, linlin, roweff, coleff, rowcol)
+# note the C and R when solo cannot be nested
+anova(indep, linlin, roweff, test = "Chisq")
+anova(indep, linlin, coleff, test = "Chisq")
+```
+
+*None of these fits come close as RC2 does. These steps have been repeated, excluding the "Farm" category (not) shown. The linear fits improve slightly but never come close to the RC2 which also improves very slightly on it's already very satisfactory fit.*

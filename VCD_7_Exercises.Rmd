@@ -1,0 +1,732 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r setup}
+require(vcd)
+require(vcdExtra)
+require(MASS)
+require(lmtest)
+require(effects)
+require(lattice)
+require(splines)
+require(gpairs)
+require(car)
+require(ca)
+require(GGally)
+require(rms)
+```
+
+---
+title: "VCD Exercise 7"
+author: "Julian Hatwell"
+date: "27 March 2016"
+output: html_document
+---
+
+## 7.1 
+Arbuthnot's data on the sex ratio of births in London was examined in Example 3.1. Use a binomial logistic regression model to assess whether the proportion of male births varied with the variables Year, Plague, and Mortality in the Arbuthnot data set. Produce effect plots for the terms in this model. What do you conclude?
+
+```{r}
+data("Arbuthnot", package = "HistData")
+```
+
+
+*First, exploring the data.*
+
+*It is obvious that Year is a continuous time series. Looking to see how the other variables are distributed:*
+
+```{r}
+histblue <- function(x, nm) {
+  hist(x, col = "lightblue"
+       , border = "darkblue"
+       , col.axis = "darkblue"
+       , col.lab = "darkblue"
+       , col.main = "darkblue"
+       , xlab = nm
+       , main = paste("Histogram of", nm))
+  }
+oldpar <- par()
+par(mfrow = c(2,2))
+histblue(Arbuthnot$Mortality, "Mortality")
+histblue(Arbuthnot$Plague, "Plague")
+histblue(log(Arbuthnot$Mortality), "log(Mortality)")
+histblue(log(Arbuthnot$Plague), "log(Plague)")
+
+par(oldpar)   
+```
+
+*Both variables show an extreme skew and a single extreme reading, which may warrant further attention.*
+
+*Now to fitting only one variable at a time.*
+
+```{r}
+arb.glm1y <- glm(cbind(Males, Females) ~ Year
+    , data = Arbuthnot, family = binomial)
+coeftest(arb.glm1y)
+anova(arb.glm1y, test = "Chisq")
+```
+
+*This coef appears to be significant but is not terribly informative. However, it is known that the data is collected over 81 year's, so it's possible to calculate what effect this would have from the start to the end of the period.*
+
+```{r, echo=TRUE}
+cat("odds ratio for Year", exp(coef(arb.glm1y)["Year"]))
+cat("odds ratio for Year, after 81 years",exp(coef(arb.glm1y)["Year"]*81))
+```
+
+*From this result, it appears that P(Male) decreases by 2% (i.e. multiplied by 0.98) over the period 1629-1710. The $\chi^2$ result is significant, so despite the very small effect, there is > 99% confidence that this is not a chance reading.*
+
+```{r}
+arb.glm1p <- glm(cbind(Males, Females) ~ Plague
+    , data = Arbuthnot, family = binomial)
+coeftest(arb.glm1p)
+cat("odds ratio for Plague", exp(coef(arb.glm1p)["Plague"]))
+anova(arb.glm1p, test = "Chisq")
+```
+
+*The plague variable does not appear to be significant, at least as a sole predictor.*
+
+```{r}
+arb.glm1m <- glm(cbind(Males, Females) ~ Mortality
+    , data = Arbuthnot, family = binomial)
+coeftest(arb.glm1m)
+cat("odds ratio for Mortality", exp(coef(arb.glm1m)["Mortality"]))
+anova(arb.glm1m, test = "Chisq")
+```
+
+*The various tests show significance for this variable, though again the effects are tiny.*
+
+*Now a model with all three, as per the question, although now there is the assumption that Plague is not a useful predictor.*
+
+```{r}
+arb.glm3a <- glm(cbind(Males, Females) ~ Year+Plague+Mortality
+    , data = Arbuthnot, family = binomial)
+coeftest(arb.glm3a)
+anova(arb.glm3a, test = "Chisq")
+```
+
+*There is quite an unexpected result here in the coefs. Year, not significant while plague moderately signif. Mortality as expected.*
+
+*The ANOVA test is closer to expectations, though order matters here.*
+
+*Refitting in a different order:*
+
+```{r}
+arb.glm3b <- glm(cbind(Males, Females) ~ Plague+Mortality+Year
+    , data = Arbuthnot, family = binomial)
+coeftest(arb.glm3b)
+anova(arb.glm3b, test = "Chisq")
+```
+
+*Mortality the only imporant var this time. This is all very inconsistent.*
+
+*Taking a look at the effect plots (for the first model Year+Plague+Mortality):*
+
+```{r}
+arb.eff <- allEffects(arb.glm3a, partial.residuals = TRUE)
+plot(arb.eff, ylab = "P(Male)")
+```
+
+*In the Year effect plot there is a reflection of the nonlinear trend seen in the early chapters. The two other plots are impossible to diagnose because of the high skew and the presence of one outlier point, as was discovered by exploration.*
+
+*It will be necessary to use transformed versions of these vars, possibly ommitting the outlier, which is completely outside the normal range.*
+
+```{r}
+head(Arbuthnot[order(Arbuthnot$Mortality, decreasing = TRUE),])
+head(Arbuthnot[order(Arbuthnot$Plague, decreasing = TRUE),])
+```
+
+*It appears that point 37 has extreme values for both Plague and Mortality.*
+
+```{r, echo=TRUE}
+Arb <- Arbuthnot[-37,]
+Arb$logPlague <- log(Arb$Plague + 1) # correct for zeros
+Arb$logMortality <- log(Arb$Mortality + 1) # correct for zeros
+```
+
+*Time to have another look at how the data are distributed*
+
+```{r}
+gpairs(Arb[,c(1,6,8,9)])
+cor(Arb[,c(1,6,8,9)])
+```
+
+*The high correlation between the vars of interest is a cause for attention. This may be a cause to remove one or two of them or to look for interaction terms.*
+
+*First, fitting with the log transformed variables:*
+
+```{r}
+arb.glm3lg <- glm(cbind(Males, Females) ~ Year+logPlague+logMortality
+    , data = Arb, family = binomial)
+coeftest(arb.glm3lg)
+exp(coef(arb.glm3lg))
+anova(arb.glm3lg, test = "Chisq")
+```
+
+*These results again are a little inconsistent but comes out on the side of Year and logMortality being important. It looks like log(Plague) can certainly be ignored.*
+
+```{r}
+arb.eff <- allEffects(arb.glm3lg, partial.residuals = TRUE)
+plot(arb.eff, ylab = "P(Male)")
+```
+
+*Looking at the effect plot, there may be a quadratic relationship with log(Plague), and perhaps a cubic/natural spline term for Year to correct for the observed nonlinearity there.*
+
+```{r}
+arb.glm3nl <- glm(cbind(Males, Females) ~ ns(Year, 3)+poly(logPlague,2)+logMortality
+    , data = Arb, family = binomial)
+coeftest(arb.glm3nl)
+anova(arb.glm3nl, test = "Chisq")
+
+arb.eff <- allEffects(arb.glm3nl, partial.residuals = TRUE)
+plot(arb.eff, ylab = "P(Male)")
+```
+
+*Adding in a basis function to try to capture the hockey stick in the loess on residuals of logMortality effect plot.*
+
+```{r, echo=TRUE}
+# basis function for the hockey stick line in the effect plot
+basis1 <- function(X) {
+  x <- if (X >=9.7) { (X-9)^2 } else { 0 }
+  X - x
+}
+```
+
+```{r}
+Arb$basisMortality <- sapply(Arb$logMortality, basis1)
+
+arb.glm3nl2 <- glm(cbind(Males, Females) ~ ns(Year, 3)+poly(logPlague,2)+poly(basisMortality,2)
+    , data = Arb, family = binomial)
+anova(arb.glm3nl2, test = "Chisq")
+
+arb.eff <- allEffects(arb.glm3nl2, partial.residuals = TRUE)
+plot(arb.eff, ylab = "P(Male)")
+```
+
+*logPlague still looks like it's significant while basis(logMortality) in not at all. However, it's really the spline on Year that is the model of interest here.*
+
+*Now looking at simple interactions between the terms:*
+
+```{r}
+arb.glm3in <- glm(cbind(Males, Females) ~ Year*logMortality*logPlague
+    , data = Arb, family = binomial)
+anova(arb.glm3in, test = "Chisq")
+
+arb.eff <- allEffects(arb.glm3in, partial.residuals = TRUE)
+plot(arb.eff, ylab = "P(Male)")
+```
+
+*From all this exploration it seems reasonable to exclude plague and look at interactions between ns(Year,3) and poly(log(Mortality),2)*
+
+```{r}
+arb.glm2in <- glm(cbind(Males, Females) ~ ns(Year,3)*poly(logMortality,2)
+    , data = Arb, family = binomial)
+anova(arb.glm2in, test = "Chisq")
+
+arb.eff <- allEffects(arb.glm2in, partial.residuals = TRUE)
+plot(arb.eff, ylab = "P(Male)", main = "")
+plot(arb.eff, ylab = "P(Male)", main = ""
+     , multiline = TRUE
+     , ci.style = "bands"
+     , key.args = list(columns = 2))
+
+LRstats(arb.glm1y, arb.glm3a)
+LRstats(arb.glm3nl, arb.glm2in)
+```
+
+*This model appears to fit the data very well, although this is not reflected in the likelihood ratio test against the saturated model. Nevertheless it does better than all the others (a selection are shown).*
+
+*This investigation has shown the complexity of working with highly correlated variables. To conclude, the findings are that there is a non-linear relationship with an interaction between a spline function of Year and quadratic in the log transformed Mortality rate. This is quite difficult to interpret.*
+
+*The spline term on Year is probably the best representation of some trend over time. The interaction effect of mortality may possibly be explained as some kind of reaction to mortality/survival of children already born inlfuencing birth rates, which could cause systemic, time delayed fluctuations. How this would translate into changes in the ratio of males to females is anybody's guess.*
+
+## 7.2 
+For the Donner Party data in Donner, examine Grayson's 1990 claim that survival in the Donner Party was also mediated by the size of the family unit. This takes some care, because the family variable in the Donner data is a simplified grouping based on the person's name and known alliances among families from the historical record. Use the following code to compute a family.size variable from each individual's last name:
+
+```{r, echo=TRUE}
+Donner$survived <- factor(Donner$survived, labels = c("no", "yes"))
+lame <- strsplit(rownames(Donner), ",")
+lame <- sapply(lame, function(x) x[[1]])
+Donner$family.size <- as.vector(table(lame)[lame])
+```
+
+ (a)	Choose one of the models (donner.mod4, donner.mod6) from Example 7.9 that include the interaction of age and sex and nonlinear terms in age. Fit a new model that adds a main effect of family.size. What do you conclude about Grayson's claim?
+
+```{r}
+donner.mod4 <- glm(survived ~ poly(age, 2) * sex,
+                   data = Donner, family = binomial)
+donner.mod4a <- update(donner.mod4, .~. + family.size)
+anova(donner.mod4, donner.mod4a, test = "Chisq")
+```
+
+*This new models are a better fit than the versions without family size.*
+
+(b)	Produce an effect plot for this model.
+
+```{r}
+donner.eff <- allEffects(donner.mod4a, partial.residuals = TRUE)
+plot(donner.eff)
+```
+
+(c)	Continue, by examining whether the effect of family size can be taken as linear, or whether a nonlinear term should be added.
+
+*It does appear as though there could be some non-linearity. First try with a quadratic term:*
+
+```{r}
+donner.mod4b <- update(donner.mod4, .~. + poly(family.size, 2))
+anova(donner.mod4, donner.mod4a, donner.mod4b, test = "Chisq")
+```
+
+*Quadratic is a further significant improvement on fit.*
+
+```{r}
+donner.mod4c <- update(donner.mod4, .~. + ns(family.size, 4))
+anova(donner.mod4, donner.mod4a, donner.mod4c, test = "Chisq")
+```
+
+*The natural spline is better still.*
+
+```{r}
+donner.eff <- allEffects(donner.mod4c, partial.residuals = TRUE)
+plot(donner.eff)
+```
+
+## 7.3 
+Use component+residual plots (Section 7.5.3) to examine the additive model for the ICU data given by
+
+```{r}
+data("ICU", package = "vcdExtra")
+names(ICU)
+ICU <- ICU[,-c(4, 20)]  # remove redundant race, coma
+levels(ICU$cancer) <- c("C=nonCancer", "C=Cancer")
+levels(ICU$admit) <- c("E=Elective","E=Emerg")
+levels(ICU$uncons) <- c("A=Conc","A=Unconc")
+levels(ICU$died) <- c("Z=Survived","Z=Died")
+```
+
+
+```{r, echo = TRUE}
+icu.glm2 <- glm(died ~ age + cancer + admit + uncons,
+                data = ICU, family = binomial)
+```
+
+(a)	What do you conclude about the linearity of the (partial) relationship between age and death in this model?
+
+```{r}
+crPlots(icu.glm2, ~age, id.n = 4)
+```
+
+*This is a tricky one because a significant majority of residuals lie very directly on the linear fit. However, there is a sytematic pattern that some of the residuals follow a non-linear, possibly inverse fit. Perhaps there is an iteraction term that explains the two different facets of the residual pattern.*
+
+(b)	An alternative strategy is to allow some nonlinear relation for age in the model using a quadratic (or cubic) term like poly(age, 2) (or poly(age, 3)) in the model formula. Do these models provide evidence for a nonlinear effect of age on death in the ICU?
+
+*Fitting a model including a polynomial term and replotting to see if that improves the fit.*
+
+```{r}
+icu.glm2p <- glm(died ~ poly(age,2) + cancer + admit + uncons,
+                data = ICU, family = binomial)
+crPlots(icu.glm2p, ~poly(age,2), id.n = 4)
+```
+
+*It doesn't help.*
+
+```{r}
+anova(icu.glm2, icu.glm2p, test = "Chisq")
+```
+
+*ANOVA agrees that adding poly term does not improve the fit.*
+
+## 7.4 
+Explore the use of other marginal and conditional plots to display the relationships among the variables predicting death in the ICU in the model icu.glm2. For example, you might begin with a marginal gpairs () plot showing all bivariate marginal relations, something like this:
+
+```{r}
+gpairs(ICU[, c("age", "cancer", "admit", "uncons")]
+       , diag.pars = list(fontsize = 16
+                          , hist.color = "lightgray")
+       , mosaic.pars = list(gp=shading_Friendly
+                            , gp_args = list(interpolate=1:4))
+       )
+```
+
+*Because gpairs doesn't seem to be working on boxplots:*
+
+```{r}
+boxcols = c("lightblue", "wheat", "darkorchid1", "violetred2")
+bwplot(age~cancer+admit+uncons+died, data = ICU
+       , par.settings = list(axis.text = list(col = "darkblue")
+                             , box.dot = list(col = "darkblue")
+                             , box.rectangle = list(fill = rep(boxcols, each = 2)))
+       , xlab = list(col = "darkblue")
+       , ylab = list(col = "darkblue")
+       )
+```
+
+```{r}
+ICU.tab <- with(ICU, table(died, cancer, admit, uncons))
+mosaic(ICU.tab
+       , gp = shading_Friendly
+       , rot_labels = c(0, 0, -30, 90)
+       , offset_labels = c(0, 1, 1, 0)
+       , offset_varnames = c(0, 0, 0, 0)
+       , legend = FALSE)
+```
+
+```{r}
+ICU.mca <- mjca(ICU.tab, lambda = "Burt")
+res <- plot(ICU.mca, labels = 0, pch = ".")
+
+lvls <- strsplit(ICU.mca$factors[,2], "=")
+lvls <- sapply(lvls, function(x) x[[2]])
+
+coords <- data.frame(res$cols, facts = ICU.mca$factors[,1], lvls)
+nlev <- ICU.mca$levels.n
+fact <- unique(as.character(coords$facts))
+cols = c("violetred2", "wheat", "darkorchid1", "lightblue")
+
+points(coords[,1:2], pch=rep(16:19, nlev), col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$lvls
+     , col=rep(cols, nlev), pos=rep(c(2,4,1,3),nlev)
+     , cex=0.9, xpd=TRUE)
+lwd <- 2
+for(i in seq_along(fact)) {
+  lines(Dim2 ~ Dim1, data = coords, subset = facts==fact[i], 
+        lwd = lwd[i], col = cols[i])
+}
+
+legend("bottomright", 
+       legend = c("died", "cancer", "admit", "unconcs"),
+       title = "Factor", title.col = "black",
+       col = cols, text.col = cols, pch = 16:19,
+       bg = "gray95", cex = 0.8)
+```
+
+*To conclude, it appears that uncons is a very strong predictor of died/survived.*
+
+## 7.5 
+The data set Caesar in vcdExtra gives a 3 × 23 frequency table classifying 251 women who gave birth by Caesarian section by Infection (three levels: none, Type 1, Type2) and Risk, whether Antibiotics were used, and whether the Caesarian section was Planned or not. Infection is a natural response variable. In this exercise, consider only the binary outcome of infection vs. no infection.
+
+```{r}
+data("Caesar", package = "vcdExtra")
+```
+
+(a)Fit the main-effects logit model for the binary response Infect. Note that with the data in the form of a frequency data frame you will need to use weights=Freq in the call to glm(). (It might also be convenient to reorder the levels of the factors so that “No” is the baseline level for each.)
+
+```{r}
+caes.dat <- as.data.frame(Caesar)
+caes.dat$Risk <- factor(caes.dat$Risk, levels = c("No", "Yes"))
+caes.dat$Planned <- factor(caes.dat$Planned, levels = c("No", "Yes"))
+caes.dat$Antibiotics <- factor(caes.dat$Antibiotics, levels = c("No", "Yes"))
+levels(caes.dat$Infection) <- ifelse(levels(caes.dat$Infection) != "None", "Yes", "No")
+caes.dat <- as.data.frame(xtabs(~.,expand.dft(caes.dat))) # expand and collapse over new infection category.
+
+caes.glm <- glm(Infection~Risk+Antibiotics+Planned, data = caes.dat, weights = Freq, family = binomial)
+```
+
+(b)	Use summary() or car::Anova() to test the terms in this model.
+
+```{r}
+summary(caes.glm)
+anova(caes.glm, test = "Chisq")
+```
+
+(c)Interpret the coefficients in the fitted model in terms of their effect on the odds of infection.
+
+```{r}
+exp(coef(caes.glm))
+invlogit <- function(o) {o/(1+o)}
+
+exp(cbind(OddsRatio = coef(caes.glm),
+          confint(caes.glm)))
+```
+
+*The intercept represents the base odds of infection. Using the inverse logit formula $p = \frac{odds}{1+odds}$ this turns out to be `r invlogit(exp(coef(caes.glm)[1]))`.*
+
+*The other coefs are the odds ratios for each variable, for example the risk factor indicates that the person is `r exp(coef(caes.glm)[2])` times as likely to have an infection.*
+
+This would translate to a probability of infection of `r exp(coef(caes.glm)[1])` * `r exp(coef(caes.glm)[2])` = `r exp(coef(caes.glm)[1]) * exp(coef(caes.glm)[2])` in the odds or a probability of `r invlogit(exp(coef(caes.glm)[1]) * exp(coef(caes.glm)[2]))`.*
+
+(d)	Make one or more effects plots for this model, showing separate terms, or their combinations.
+
+```{r}
+caes.eff <- allEffects(caes.glm, partial.residuals = TRUE)
+plot(caes.eff)
+
+caes.full <- Effect(c("Risk", "Antibiotics", "Planned"), caes.glm)
+
+# logit scale with translated axes
+plot(caes.full, multiline = TRUE,
+     colors = c("violetred2", "steelblue"), lwd = 3,
+     ticks = list(at = c(.05, .1, .25, .5, .75, .9, .95)),
+     key.args = list(x = .52, y = .92, columns = 1),
+     par.settings = list(strip.background = list(col="white")),
+     grid = TRUE)
+```
+
+## 7.6 
+The data set birthwt in the MASS package gives data on 189 babies born at Baystate Medical Center, Springfield, MA during 1986. The quantitative response is bwt (birth weight in grams), and this is also recorded as low, a binary variable corresponding to bwt < 2500 (2.5 Kg). The goal is to study how this varies with the available predictor variables. The variables are all recorded as numeric, so in R it may be helpful to convert some of these into factors and possibly collapse some low frequency categories. The code below is just an example of how you might do this for some variables.
+
+```{r}
+data("birthwt", package = "MASS")
+birthwt.facs <- birthwt
+birthwt.facs <- within(birthwt, {
+                       race <- factor(race, labels = c("white", "black", "other"))
+                       ptd <- factor(ptl > 0)
+                       ftv <- factor(ftv)
+                       levels(ftv)[-(1:2)] <- "2+"
+                       smoke <- factor(smoke > 0)
+                       ht <- factor(ht)
+                       ui <- factor(ui)
+                       })
+```
+
+ (a)	Make some exploratory plots showing how low birth weight varies with each of the available predictors. In some cases, it will probably be helpful to add some sort of smoothed summary curves or lines.
+ 
+*gpairs is not rendering boxplots so working with GGally::ggpairs for now:*
+
+```{r}
+# ggpairs(birthwt.facs)
+scatterplotMatrix(birthwt.facs[,c(1,2,3,10)], smooth = FALSE
+                  , id.n = 2, ellipse = TRUE
+                  , levels = 0.95, robust = FALSE
+                  , diagonal = "histogram"
+                  , groups = birthwt.facs$low
+                  , col = c("steelblue", "violetred2"))
+
+dargs <- list(gp_varnames = gpar(fontsize = 14), offset_varnames = -2.5,
+              labeling = labeling_border(alternate_labels = FALSE))
+pairs(table(birthwt.facs[,c(1,4,5,7,8,9,11)])
+            , shade = TRUE
+            , space = 0.25
+            , gp_args = list(interpolate = 1 : 3)
+            , diag_panel_args = dargs
+            )
+```
+
+(b)	Fit several logistic regression models predicting low birth weight from these predictors, with the goal of explaining this phenomenon adequately, yet simply.
+
+*First to try fitting the full and pairing back unnecessary vars:*
+
+```{r}
+birthwt.full <- glm(low ~ ., data = birthwt.facs, family = binomial)
+birthwt.full1 <- update(birthwt.full, .~.-ptl -bwt)
+anova(birthwt.full1, test = "Chisq")
+LRstats(birthwt.full1)
+
+birthwt.glm <- update(birthwt.full1, .~. - race - ftv)
+anova(birthwt.glm, birthwt.full1, test = "Chisq")
+LRstats(birthwt.glm)
+
+birthwt.glm2 <- update(birthwt.glm, .~. - age)
+anova(birthwt.glm2, birthwt.glm, birthwt.full1, test = "Chisq")
+LRstats(birthwt.glm2)
+anova(birthwt.glm2, test = "Chisq")
+
+birthwt.glm3 <- update(birthwt.glm2, .~. - ui)
+anova(birthwt.glm3, birthwt.glm2, birthwt.glm, birthwt.full1, test = "Chisq")
+LRstats(birthwt.glm3)
+anova(birthwt.glm3, test = "Chisq")
+
+birthwt.glm4 <- update(birthwt.glm3, .~. - smoke)
+anova(birthwt.glm4, birthwt.glm3, birthwt.glm2, birthwt.glm, birthwt.full1, test = "Chisq")
+LRstats(birthwt.glm4)
+anova(birthwt.glm4, test = "Chisq")
+
+birthwt.glm5 <- update(birthwt.glm4, .~. - lwt)
+anova(birthwt.glm5, birthwt.glm4, birthwt.glm3, birthwt.glm2, birthwt.glm, birthwt.full1, test = "Chisq")
+LRstats(birthwt.glm5)
+anova(birthwt.glm5, test = "Chisq")
+```
+
+*From the above work, probably model 4 would be selected as balancing of fit and parsimony.*
+
+*Try with automated selection:*
+
+```{r}
+birthwt.step1 <- stepAIC(birthwt.full1, trace = FALSE)
+birthwt.step1$anova
+birthwt.step2 <- stepAIC(birthwt.full1, trace = FALSE, k = log(250))
+birthwt.step2$anova
+```
+
+*AIC model is too complicated. BIC came up with the same model as the manually iterated model.*
+
+```{r}
+anova(birthwt.step2, birthwt.glm4, test = "Chisq")
+```
+
+(c)	Use some graphical displays to convey your findings.
+
+```{r}
+birthwt.effects <- allEffects(birthwt.glm4)
+plot(birthwt.effects
+     , ylab = "Probability(low birth weight)"
+     , ask = FALSE)
+
+birthwt.eff <- Effect(c("lwt", "ht", "ptd"), birthwt.glm4)
+
+# logit scale with translated axes
+plot(birthwt.eff, multiline = TRUE,
+     colors = c("steelblue", "violetred2"), lwd = 3,
+     ticks = list(at = c(.05, .1, .25, .5, .75, .9, .95)),
+     key.args = list(x = .52, y = .92, columns = 1),
+     par.settings = list(strip.background = list(col="white")),
+     grid = TRUE)
+```
+
+```{r}
+# to use some tools in the trs package
+dd <- datadist(birthwt.facs)
+options(datadist = "dd")
+birthwt.lrm1 <- lrm(low ~ lwt + ht + ptd, data = birthwt.facs)
+
+sum.birthwt.lrm1 <- summary(birthwt.lrm1)
+plot(sum.birthwt.lrm1, log = TRUE
+     , main = "Odds ratio for 'low'"
+     , cex = 1.25
+     , col = rgb(0.1, 0.1, 0.8
+                 , alpha = c(0.3, 0.5, 0.8))
+     )
+options(datadist = NULL)
+detach(package:rms)
+detach(package:Hmisc)
+```
+
+```{r}
+binreg_plot(birthwt.glm4, type = "response", conf_level = 0.68
+            , legend = FALSE, labels = TRUE
+            , labels_just = c("right", "bottom")
+            , labels_offset = c(-0.225,0.09)
+            , cex = 0, point_size = 0.8, pch = 15:17
+            , ylab = "P(low)"
+            )
+```
+
+```{r}
+res <- influencePlot(birthwt.glm4
+                     , id.col = "blue"
+                     , scale = 8, id.n = 3)
+# label the contours of influence
+k <- length(coef(birthwt.glm4))
+n <- nrow(birthwt.facs)
+text(x = c(2, 3) * k / n, y = -1.8, c("2k/n", "3k/n"), cex = 1.2)
+
+# show data together with diagnostics for influential cases
+idx <- which(rownames(birthwt.facs) %in% rownames(res))
+cbind(birthwt.facs[idx,2:4], res)
+
+influenceIndexPlot(birthwt.glm4
+                   , vars=c("Cook", "Studentized", "hat")
+                   , id.col = "red", id.n=4)
+```
+
+```{r}
+# custom plotting of DFBETAS
+infl <- influence.measures(birthwt.glm4)
+dfbetas <- data.frame(infl$infmat[,2:5])
+
+mt <- dfbetas[,1]
+
+cols <- ifelse(birthwt.facs$low == 1, "red", "blue")
+plot(mt, type = "h", col = cols,
+     xlab = "Observation index", 
+     ylab = expression(Delta * beta[lwt]), 
+     cex.lab = 1.3)
+points(mt, col = cols)
+# label some points
+big <- abs(mt) > .25
+idx <- 1 : nrow(dfbetas)
+text(idx[big], dfbetas[big, 1], label = rownames(dfbetas)[big],
+     cex = 0.9, pos = ifelse(dfbetas[big, 1] > 0, 3, 1), 
+     xpd = TRUE)
+abline(h = c(-.25, 0, .25), col = "gray")
+```
+
+```{r}
+scatterplotMatrix(dfbetas, smooth = FALSE
+                  , id.n = 2, ellipse = TRUE
+                  , levels = 0.95, robust = FALSE
+                  , diagonal = "histogram"
+                  , groups = birthwt.facs$low
+                  , col = c("blue", "red"))
+```
+
+## 7.7 
+Refer to Exercise 5.9 for a description of the Accident data. The interest here is to model the probability that an accident resulted in death rather than injury from the predictors age, mode, and gender. With glm(), and the data in the form of a frequency table, you can use the argument weight=Freq to take cell frequency into account.
+
+```{r}
+data("Accident", package = "vcdExtra")
+Accident$result <- factor(Accident$result, levels = c("Injured", "Died"))
+```
+
+
+(a)	Fit the main effects model, result=="Died" ~ age + mode + gender. Use car::Anova() to assess the model terms.
+
+```{r}
+acc.glm1 <- glm(result~age + mode + gender
+                , data = Accident
+                , weights = Freq
+                , family = binomial)
+anova(acc.glm1, test = "Chisq")
+LRstats(acc.glm1)
+```
+
+(b)	Fit the model that allows all two-way interactions. Use anova () to test whether this model is significantly better than the main effects model.
+
+```{r}
+acc.glm2 <- glm(result~age * mode + age * gender + mode * gender
+                , data = Accident
+                , weights = Freq
+                , family = binomial)
+anova(acc.glm2, test = "Chisq")
+LRstats(acc.glm2)
+```
+
+(c)	Fit the model that also allows the three-way interaction of all factors. Does this offer any improvement over the two-way model?
+
+```{r}
+acc.glm3 <- glm(result~age * mode * gender
+                , data = Accident
+                , weights = Freq
+                , family = binomial)
+anova(acc.glm3, test = "Chisq")
+LRstats(acc.glm3)
+```
+
+```{r}
+anova(acc.glm1, acc.glm2, acc.glm3, test = "Chisq")
+LRstats(acc.glm1, acc.glm2, acc.glm3)
+```
+
+*The model with 3 way interation term is no better than the model with only two way terms.*
+
+(d)	Interpret the results of the analysis using effect plots for the two-way model, separately for each of the model terms. Describe verbally the nature of the age*gender effect. Which mode of transportation leads to greatest risk of death?
+
+```{r}
+oldpar <- par()
+par(mfrow = c(1,3))
+for(var in names(Accident)[c(1,3,4)]) {
+  acc.eff1 <- Effect(var, acc.glm2)
+
+  p <- plot(acc.eff1
+     , colors = c("violetred2", "steelblue"), lwd = 3
+     , grid = TRUE)
+  print(p)
+}
+par(oldpar)
+
+acc.effects <- allEffects(acc.glm2)
+plot(acc.effects
+     , ylab = "Probability(death)"
+     , ask = FALSE
+     , colors = c("violetred2", "steelblue")
+     , par.settings = list(strip.background = list(col="white"))
+     )
+```
+
+*Gender Male has a very similar risk of death at age 0-9, but after than is much higher risk at all levels of age.*
+
+*Pedestrian is the mode of transport that carries the highest risk of death although this has a complicated relationship with the other variables. It's highest for males over all, but scores about the same as 4 wheels for females.
+It is highest of all among the oldest age group, and generally higher or at least the same as any other mode in all the age groups.*

@@ -1,0 +1,602 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r setup}
+require(vcd)
+require(vcdExtra)
+require(ca)
+require(knitr)
+```
+
+---
+title: "VCD Chapter 6 Exercises"
+author: "Julian Hatwell"
+date: "25 March 2016"
+output: html_document
+---
+
+## 6.1 
+
+The JobSat data in vcdExtra gives a 4 × 4 table recording job satisfaction in relation to income.
+
+```{r}
+data("JobSat", package = "vcdExtra")
+JobSat
+```
+
+(a)	Carry out a simple correspondence analysis on this table. How much of the inertia is accounted for by a one-dimensional solution? How much by a two-dimensional solution?
+
+```{r}
+JobSat.ca <- ca(JobSat)
+summary(JobSat.ca)
+```
+
+*76.4% of the inertia is accounted for by the first dimension and a total of 96.1% when the second dimension is included. A property of the correspondance analysis is that the solutions are nested, so the one dimensional solution is identical to the first dimension of higher dimensional solutions.*
+
+(b)	Plot the 2D CA solution. To what extent can you consider the association between job satisfaction and income “explained” by the ordinal nature of these variables?
+
+```{r}
+plot(JobSat.ca)
+```
+
+*The levels of job satisfaction are only partly explained by the ordinal nature of the variables. The first dimension accounts for 76% of the association and the points from each variable do not project along this line in the same order. Only the association between >40K salaries and very satisfied is absolutely clear.*
+
+*The second dimension is less easy to inerpret though it assists in visualising that there is a stronger link between very disatisfied and 15-25K, rather than the lowest salary band. Likewise for 25-40K and Little disatisfied. In fact there is a stronger association between Moderately satisfied and the lowest salary band than either intermediate band.*
+
+## 6.2 
+Refer to Exercise 5.1 in Chapter 5. Carry out a simple correspondence analysis on the 4 × 5 table criminal from the logmult package.
+
+```{r}
+data("criminal", package = "logmult")
+criminal
+```
+
+(a)	What percentages of the Pearson χ2 for association are explained by the various dimensions?
+
+```{r}
+criminal.ca <- ca(criminal)
+sum.crim.ca <- summary(criminal.ca)
+kable(data.frame(dims = paste("dim", 1:3), X2explained = round(sum.crim.ca$scree[,"values2"], 2)))
+```
+
+(b)	Plot the 2D correspondence analysis solution. Describe the pattern of association between year and age.
+
+```{r}
+plot(criminal.ca)
+```
+
+*Most of the association (>90%) is along the first dimension. The association between age and year is clear from the plot with youngest individuals located very close to 1958 and progressively older for the previous years. This corresponds to the shift in centre of mass for the age group towards releasing younger individuals in later years.*
+
+## 6.3 
+Refer to Exercise 5.2 for a description of the AirCrash data from the vcdExtra package. Carry out a simple correspondence analysis on the 5 × 5 table of Phase of the flight and Cause of the crash.
+
+```{r}
+data("AirCrash", package = "vcdExtra")
+aircrash.tab <- xtabs(Fatalities ~ Phase + Cause, data = AirCrash)
+aircrash.tab <- aircrash.tab[c(4,2,1,3,5),
+                             c(4,2,3,5,1)
+                             ]
+aircrash.ca <- ca(aircrash.tab)
+(sum.air.ca <- summary(aircrash.ca))
+```
+
+(a)	What percentages of the Pearson χ2 for association are explained by the various dimensions?
+
+```{r}
+kable(data.frame(dims = paste("dim", 1:4), X2explained = round(sum.air.ca$scree[,"values2"], 2)))
+```
+
+(b)	Plot the 2D correspondence analysis solution. Describe the pattern of association between phase and cause. How would you interpret the dimensions?
+
+```{r}
+plot(aircrash.ca)
+```
+```{r, fig.show='hide'}
+# customized plot
+res <- plot(aircrash.ca, what=c("all", "none"), labels = 0, pch = ".", xpd = TRUE)
+# extract factor names and levels - exclude unknown
+coords.rows <- data.frame(res$rows[rownames(res$rows) != "unknown",])
+coords.rows$levels <- rownames(coords.rows)
+```
+```{r}
+res <- plot(aircrash.ca, labels = 0, pch = ".", xpd = TRUE)
+# extract factor names and levels - exclude unknown
+coords.cols <- data.frame(res$cols[rownames(res$cols) != "unknown",])
+coords.cols$levels <- rownames(coords.cols)
+
+coords <- rbind(coords.rows, coords.cols)
+
+# sort by Dim 1
+coords$factor <- rep(c("Phase", "Cause"), each = 4)
+coords <- coords[ order(coords[,"factor"], coords[,"Dim1"]), ]
+
+cols <- c("blue", "red")
+nlev <- c(4,4)
+text(coords[,1:2], coords$levels, col=rep(cols, nlev), pos=1)
+points(coords[,1:2], pch=rep(16:17, nlev), col=rep(cols, nlev), cex=1.2)
+
+lines(Dim2 ~ Dim1, data=coords, subset=factor=="Cause",  lty=1, lwd=2, col=cols[1])
+lines(Dim2 ~ Dim1, data=coords, subset=factor=="Phase", lty=1, lwd=2, col=cols[2])
+```
+
+*The second plot has the points for unknown removed as they hinder the interpretation.*
+
+*The first dimension seems to separate take-off and landing from the other two phases. This could be thought of as differences between engagement by the flight crew, in particular the pilots.*
+
+*The second dimension appears to separate human error and mechanical from weather and criminal. Perhaps this could be seen as preventable vs unforeseeable types of events, but it's a fairly vague interpretation.*
+
+(c)	The default plot method uses map=“symmetric” with points for both rows and columns. Try using map=“symbiplot” with vectors (arrows=) for either rows or columns. (Read help (plot.ca) for a description of these options.)
+
+```{r}
+plot(aircrash.ca, map="symbiplot", arrows = c(TRUE, FALSE))
+plot(aircrash.ca, map="symbiplot", arrows = c(FALSE, TRUE))
+```
+
+*Of these, the first plot at first glance emphasises the unknown causes occuring en route. The second plot emphasises a strong link between weather cause and langing phase, compared to mechanical and human error with landing phase.*
+
+## 6.4 
+The data set caith in MASS gives a classic table tabulating hair color and eye color of people in Caithness, Scotland, originally from Fisher (1940).
+
+(a)	Carry out a simple correspondence analysis on this table. How many dimensions seem necessary to account for most of the association in the table?
+
+```{r}
+data("caith", package = "MASS")
+ca.ca <- ca(caith)
+sum.ca.ca <- summary(ca.ca)
+kable(data.frame(dims = paste("dim", 1:3), X2explained = round(sum.ca.ca$scree[,"values2"], 2)))
+```
+
+*A single dimension explains most of the variation and the first two explain all of it minus a tiny fraction.*
+
+(b)	Plot the 2D solution. The interpretation of the first dimension should be obvious; is there any interpretation for the second dimension?
+
+```{r}
+plot(ca.ca)
+mosaic(as.matrix(caith), shade = TRUE)
+```
+
+*The second dimension separates medium from all the others. It's not obvious but there must be something different about the classification as medium on both categories.*
+
+*Reviewing the mosaic plot for this data helps to visualise that medium is over represented. Perhaps, given the amiguity of the descriptor, the people who originally collected the data had a tendency to score medium observations over the others when they weren't sure.*
+
+## 6.5 
+The same data, plus a similar table for Aberdeen, are given as a three-way table as HairEyePlace in vcdExtra.
+
+(a)	Carry out a similar correspondence analysis to the last exercise for the data from Aberdeen. Comment on any differences in the placement of the category points.
+
+```{r}
+data("HairEyePlace", package = "vcdExtra")
+aba.ca <- ca(HairEyePlace[,,"Aberdeen"])
+sum.aba.ca <- summary(aba.ca)
+kable(data.frame(dims = paste("dim", 1:3), X2explained = round(sum.aba.ca$scree[,"values2"], 2)))
+```
+
+```{r}
+plot(aba.ca)
+```
+
+*The only small difference appears to be in the placement of the light hair point.*
+
+(b)	Analyze the three-way table, stacked to code hair color and place interactively, i.e., for the loglinear model [Hair Place][Eye]. What does this show?
+
+```{r}
+# interactive coding of Hair and Place
+hp.e <- t(as.data.frame(HairEyePlace))
+hp.e.ca <- ca(hp.e)
+sum.hp.e.ca <- summary(hp.e.ca)
+kable(data.frame(dims = paste("dim", 1:3), X2explained = round(sum.hp.e.ca$scree[,"values2"], 2)))
+plot(hp.e.ca)
+```
+
+*This approach superimposes the two places on the same plot and appears to highlight the overall similarities. The distribution of red and dark hair differs slightly. Red hair being more common in Aberdeen (closer to the origin).*
+
+## 6.6 
+The data set Gilby in vcdExtra gives a classic (but now politically incorrect) 6 × 4 table of English schoolboys classified according to their clothing and their teacher's rating of “dullness” (lack of intelligence).
+
+(a)	Compute and plot a correspondence analysis for this data. Write a brief description and interpretation of these results.
+
+```{r}
+data("Gilby", package = "vcdExtra")
+Gilby
+gilby.ca <- ca(Gilby)
+sum.gilby.ca <- summary(gilby.ca)
+kable(data.frame(dims = paste("dim", 1:3), X2explained = round(sum.gilby.ca$scree[,"values2"], 2)))
+plot(gilby.ca)
+```
+
+*The first dimension explains 78% of the $\chi^2$ statistic and both categories line up ordinally from left to right projected onto this line.*
+
+*The variables are also well separated between the centre and the extremes when looking at the second dimension, giving the plot points a very clear smile pattern.*
+
+*Without more information, it's difficult to guess at an explanation for this pattern.*
+
+(b)	Make an analogous mosaic plot of this table. Interpret this in relation to the correspondence analysis plot.
+
+```{r}
+mosaic(Gilby, shade = TRUE
+      , rot_labels = 0
+      , rot_varnames = 0
+      , offset_labels = c(0, 2)
+      , offset_varnames = 0
+      , abbreviate = c(FALSE, 8)
+       )
+```
+
+*The classic opposite corner pattern is evident although on close inspection it is not fully reaching into the botton right corner. The extremes of Insufficiently well clad and Very Able intelligence do not follow the trend. Clearly there is a more complicated pattern which may warrant further investigation.*
+
+## 6.7 
+For the mental health data analyzed in Example 6.2, construct a shaded sieve diagram and mosaic plot. Compare these with the correspondence analysis plot shown in Figure 6.2. What features of the data and the association between SES and mental health status are shown in each?
+
+*Reproducing the example first*
+
+```{r}
+data("Mental", package="vcdExtra")
+mental.tab <- xtabs(Freq ~ ses + mental, data = Mental)
+mental.ca <- ca(mental.tab)
+summary(mental.ca)
+
+op <- par(cex=1.3, mar=c(5,4,1,1)+.1)
+res <- plot(mental.ca,  ylim = c(-.2, .2))
+lines(res$rows, col = "blue", lty = 3)
+lines(res$cols, col = "red", lty = 4)
+par(op)
+```
+
+```{r}
+sieve(mental.tab, gp = shading_Friendly)
+mosaic(mental.tab, gp = shading_Friendly)
+```
+
+*Looking at the three plots together, one interpretation would be that the data follows a classic opposite corner pattern. There is additional complexity in the moderate mental health category where the pattern doesn't hold in the strucplots and the lines cross in the correspondence plot. There seems to be room for further investigation of this factor.*
+
+## 6.8 
+Simulated data are often useful to help understand the connections between data, analysis methods, and associated graphic displays. Section 6.3.1 illustrated interactive coding in R, using a simulated 4-way table of counts of pets, classified by age, color, and sex, but with no associations because the counts had a constant Poisson mean, λ = 15.
+
+(a)	Re-do this example, but in the call to rpois(), specify a non-negative vector of Poisson means to create some associations among the table factors.
+
+*Recalling the example with some changes*
+
+```{r}
+set.seed(1234)
+dim <- c(3, 2, 2, 2)
+pet.model <- c(rep(c(30, 15, 5),4),c(rep(c(10, 10, 2, 12, 8, 2),2)))
+pet.tab <- array(rpois(prod(dim), pet.model), dim = dim)
+pet.tab[2] <- 2
+pet.tab[8] <- 30
+pet.tab[17] <- 2
+pet.tab[24] <- 10
+dimnames(pet.tab) <- list(Pet = c("dog", "cat", "bird"), 
+                      Age = c("young", "old"), 
+                      Color = c("black", "white"), 
+                      Sex = c("male", "female"))
+ftable(Pet + Age ~ Color + Sex, pet.tab)
+(pet.mat <- as.matrix(ftable(Pet + Age ~ Color + Sex, pet.tab), sep = '.'))
+mosaic(pet.tab, gp = shading_Friendly2)
+```
+
+(b)	Use CA methods to determine if and how the structure you created in the data appears in the results.
+
+```{r}
+plot(ca(pet.mat))
+```
+
+*Accompanying mosaic plot helps to cement the observations. The unusually high numbers of old white birds, young black male and young black female cats is also clear. All types of dogs and old cats show no particularly strong associations, though old cats are positions in a way that balances their preponderance in the younger generation.*
+
+```{r}
+plot(ca(pet.mat), map = "colprincipal", arrows = c(TRUE, FALSE))
+```
+
+*This alternative uses colprincipal scaling and vectors to show the dominant effects.*
+
+```{r}
+pet.tab2 <- margin.table(pet.tab, c(1,2,4))
+(pet.mat2 <- as.matrix(ftable(Pet  ~ Age + Sex, pet.tab2), sep = '.'))
+
+pet.mat3 <- rbind(pet.mat2, margin.table(pet.tab, c(3,1)))
+
+pet.ca2 <- ca(pet.mat3, suprow = 5:6)
+summary(pet.ca2)
+
+res <- plot(pet.ca2, pch=".", labels = FALSE)
+
+coords <- res$rows[5:6,]
+points(coords, pch = 24, col = "grey")
+lines(coords, lwd = 6, col = "grey")
+text(coords, rownames(coords), col = "grey", pos = c(1,3))
+
+coords <- res$cols
+points(coords, pch = 19, col = "red")
+text(coords, rownames(coords), col = "red", pos = c(3,1,1))
+
+coords <- res$rows[1:4,]
+points(coords, pch = 16, col = "blue")
+text(coords, rownames(coords), col = "blue", pos = c(3,3,1,1))
+```
+
+*Having a go at working through the supplementary row technique. This may not be the best example, but there is some utility, given a bit of trial and error (exploratory work).*
+
+## 6.9 
+The TV data was analyzed using CA in Example 6.4, ignoring the variable Time. Carry out analyses of the 3-way table, reducing the number of levels of Time to three hourly intervals as shown below.
+
+```{r}
+data("TV", package = "vcdExtra")
+TV.df <- as.data.frame.table(TV)
+levels(TV.df$Time) <- rep(c("8", "9", "10"), c(4,4,3))
+TV3 <- xtabs(Freq~Day+Time+Network, TV.df)
+structable(Day~Time+Network, TV3)
+```
+
+(a)	Use the stacking approach (Section 6.3) to perform a CA of the table with Network and Time coded interactively. You can create this using the as.matrix () method for a “Structable” object.
+
+```{r}
+TV3s <- as.matrix(structable(Day~Time+Network, TV3))
+TV3s.ca <- ca(TV3s)
+sum.TV3s.ca <- summary(TV3s)
+```
+
+(b)	What loglinear model is analyzed by this approach?
+
+```{r}
+print(loglin2string(joint(3, factors = c("Day", "Time", "Network"), with = 1)))
+print(loglin2formula(joint(3, factors = c("Day", "Time", "Network"), with = 1)))
+```
+
+(c)	Plot the 2D solution. Compare this to the CA plot of the two-way table in Figure 6.4.
+
+*First to replot the example given.*
+
+```{r}
+data("TV", package = "vcdExtra")
+TV2 <- margin.table(TV, c(1, 3))
+TV2
+TV.ca <- ca(TV2)
+TV.ca
+res <- plot(TV.ca)
+segments(0, 0, res$cols[,1], res$cols[,2], col = "red", lwd = 2)
+```
+
+```{r}
+res <- plot(TV3s.ca)
+segments(0, 0, res$cols[,1], res$cols[,2], col = "red", lwd = 2)
+```
+
+*Lines have been added to practise the technique even though they highlight a different category (Day).*
+
+*Now it's possible to drill into the scheduling and see Monday 8pm CBS and Friday 8pm ABC, with a more mixed viewing on other times/days.*
+
+*Also the thursday night effect of viewers increasing during the hours from 8-11pm is visible.*
+
+(d)	Carry out an MCA analysis using mjca() of the three-way table TV3. Plot the 2D solution, and compare this with both the CA plot and the solution for the stacked three-way table.
+
+```{r}
+TV3.mca <- mjca(TV3)
+sum.TV3.mca <- summary(TV3.mca)
+kable(data.frame(dims = paste("dim", 1:4), X2explained = round(sum.TV3.mca$scree[,"values2"], 2)))
+plot(TV3.mca)
+```
+
+*The default plot doesn't provide any clarity as all the points use the same symbols and colours.*
+
+```{r}
+# plot, but don't use point labels or points
+res <- plot(TV3.mca, labels = 0, pch = ".", cex.lab = 1)
+# extract factor names and levels
+coords <- data.frame(res$cols, TV3.mca$factors)
+nlev <- TV3.mca$levels.n
+fact <- unique(as.character(coords$factor))
+
+cols <- c("blue", "red", "brown")
+points(coords[,1:2], pch=rep(16:18, nlev), col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$level, col=rep(cols, nlev), pos=rep(c(1,4,3), nlev), 
+     cex=0.9, xpd=TRUE)
+```
+
+*This plot is using some customisation to improve the visual language but it hasn't added any useful information.*
+
+## 6.10 
+Refer to the MCA analysis of the PreSex data in Example 6.8. Use the stacking approach to analyze the stacked table with the combinations of premarital and extramarital sex in the rows and the combinations of gender and marital status in the columns. As suggested in the exercise above, you can use as.matrix (structable()) to create the stacked table.
+
+```{r}
+data("PreSex", package = "vcd")
+names(dimnames(PreSex)) <- c("M", "E", "P", "G")
+PreSex.mat <- as.matrix(structable(M+G~P+E, PreSex))
+presex.mca <- mjca(as.table(PreSex.mat), lambda = "Burt")
+summary(presex.mca)
+```
+
+(a)	What loglinear model is analyzed by this approach? Which associations are included and which are excluded in this analysis?
+
+```{r}
+cat("[MaritalStatus,Gender][PremaritalSex,ExtramaritalSex]")
+```
+
+*This approach will not provide information about joint associations between any one category and the other three or the mutual independence model.*
+
+(b)	Plot the 2D CA solution for this analysis. You might want to draw lines connecting some of the row points or column points to aid in interpretation.
+
+```{r}
+# plot, but don't use point labels or points
+res <- plot(presex.mca, labels = 0, pch = ".")
+# extract factor names and levels
+coords <- data.frame(res$cols, presex.mca$factors)
+nlev <- presex.mca$levels.n
+fact <- unique(as.character(coords$factor))
+
+posn = c(1,3)
+cols <- c("blue", "red")
+points(coords[,1:2], pch=rep(16:17, nlev), col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$level, col=rep(cols, nlev), pos=rep(posn, nlev), 
+     cex=0.9, xpd=TRUE)
+
+for(f in seq_along(fact)) {
+lines(Dim2 ~ Dim1, data = coords, subset = factor == fact[f], lwd = 2, col = cols[f])
+}
+```
+
+(c)	How does this analysis differ from the MCA analysis shown in Figure 6.10?
+
+*The figure in the book considers the isolated effect of each variable on the others. This figure encourages the viewer to look for relationships between all four variables at the same time.*
+
+## 6.11 
+Refer to Exercise 5.10 for a description of the Vietnam data set in vcdExtra.
+
+```{r}
+data("Vietnam", package = "vcdExtra")
+```
+
+(a)	Using the stacking approach, carry out a correspondence analysis corresponding to the loglinear model [R][YS], which asserts that the response is independent of the combinations of year an sex.
+
+```{r}
+Viet <- within(Vietnam, {
+  sex_year <- paste(substring(Vietnam$sex,1,1), year, sep = "_")
+})
+Viet.tab <- xtabs(Freq ~ sex_year + response, data = Viet)
+Viet.tab
+Viet.tab.ca <- ca(Viet.tab)
+summary(Viet.tab.ca)
+```
+
+(b)	Construct an informative 2D plot of the solution, and interpret in terms of how the response varies with year for males and females.
+
+```{r}
+plot(Viet.tab.ca)
+
+# plot, but don't use point labels or points
+res <- plot(Viet.tab.ca, labels = 0, pch = ".")
+# extract factor names and levels
+coords <- data.frame(rbind(res$rows, res$cols))
+coords$levels <- rownames(coords)
+names(coords[,2]) 
+
+nlev <- c(5,5,4)
+cols <- c("magenta", "darkblue", "brown")
+posn <- c(3,2,1)
+
+segments(0,0, coords[coords$levels %in% c("A","D","C"), 1], coords[coords$levels %in% c("A","D","C"), 2], col = "brown", lwd = 2)
+points(coords[,1:2], pch=rep(16:18, nlev)
+       , col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$level
+     , col=rep(cols, nlev)
+     , pos=rep(posn, nlev)
+     , cex=0.9, xpd=TRUE)
+```
+
+(c)	Use mjca () to carry out an MCA on the three-way table. Make a useful plot of the solution and interpret in terms of the relationship of the response to year and sex.
+
+```{r}
+viet.tab <- xtabs(Freq~response+sex+year, data = Vietnam)
+viet.mca <- mjca(viet.tab)
+summary(viet.mca)
+
+# plot, but don't use point labels or points
+res <- plot(viet.mca, labels = 0, pch = ".")
+# extract factor names and levels
+coords <- data.frame(res$cols, viet.mca$factors)
+nlev <- viet.mca$levels.n
+fact <- unique(as.character(coords$factor))
+
+posn = c(4,2,4)
+cols <- c("violetred2", "turquoise4", "khaki4")
+
+segments(0,0, coords[coords$level %in% c("A","D","C"), 1], coords[coords$level %in% c("A","D","C"), 2], col = "violetred1", lwd = 0.5)
+
+points(coords[,1:2], pch=rep(16:18, nlev), col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$level, col=rep(cols, nlev), pos=rep(posn, nlev), 
+     cex=0.9, xpd=TRUE)
+```
+
+*This plot is not as informative as the stacked table because it does not reveal the clustering of all female responses around "C" and the trend to move from "A" -> "D" for males as they get older.*
+
+## 6.12 
+Refer to Exercise 5.9 for a description of the Accident data set in vcdExtra. The data set is in the form of a frequency data frame, so first convert to table form.
+
+```{r}
+accident.tab <- xtabs(Freq~age+result+mode+gender
+                      , data = Accident)
+```
+
+(a)	Use mjca() to carry out an MCA on the four-way table accident.tab.
+
+```{r}
+accident.mca <- mjca(accident.tab)
+summary(accident.mca)
+```
+
+(b)	Construct an informative 2D plot of the solution, and interpret in terms of how the variable result varies in relation to the other factors.
+
+```{r}
+res <- plot(accident.mca)
+# plot, but don't use point labels or points
+res <- plot(accident.mca, labels = 0, pch = ".")
+# extract factor names and levels
+coords <- data.frame(res$cols, accident.mca$factors)
+nlev <- accident.mca$levels.n
+fact <- unique(as.character(coords$factor))
+
+posn = c(1,3,4,2)
+cols <- c("turquoise4", "violetred2", "khaki4", "darkorchid4")
+
+segments(0,0, coords[coords$level %in% c("Died", "Injured"), 1], coords[coords$level %in% c("Died", "Injured"), 2], col = "violetred1", lwd = 0.5)
+
+segments(0,0, coords[coords$level %in% c("Male", "Female"), 1], coords[coords$level %in% c("Male", "Female"), 2], col = "darkorchid4", lwd = 0.5)
+
+points(coords[,1:2], pch=rep(15:18, nlev), col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$level, col=rep(cols, nlev), pos=rep(posn, nlev), 
+     cex=0.9, xpd=TRUE)
+```
+
+*This plot shows that there is little association between gender and result. The connecting lines are orthogonal, though the distances differ.*
+
+*There appears to be a relationship between the 50+ age group and death results rather than injuries, as was seen in the previous chapter.*
+
+*Males, especially those aged between 20-49 seem to be the group having the most accidents on motorcycles. Uncertain if they results in more injury than death.*
+
+*There is a clustering between young women (age 10-19) and bicycle accidents.*
+
+## 6.13 
+The UCBAdmissions data was featured in numerous examples in Chapter 4 (e.g., Example 4.11, Example 4.15) and Chapter 5 (e.g., Example 5.14, Example 5.18).
+
+(a)	Use mjca () to carry out an MCA on the three-way table UCBAdmissions.
+
+```{r}
+ucb.mca <- mjca(UCBAdmissions)
+summary(ucb.mca)
+```
+
+(b)	Plot the 2D MCA solution in a style similar to that shown in Figure 6.10 and Figure 6.11
+
+```{r}
+# plot, but don't use point labels or points
+res <- plot(ucb.mca, labels = 0, pch = ".")
+# extract factor names and levels
+coords <- data.frame(res$cols, ucb.mca$factors)
+nlev <- ucb.mca$levels.n
+fact <- unique(as.character(coords$factor))
+
+posn = c(2,3,1)
+cols <- c("turquoise4", "violetred2", "khaki4")
+
+segments(0,0, coords[coords$level %in% c("Admitted", "Rejected"), 1], coords[coords$level %in% c("Admitted", "Rejected"), 2], col = "turquoise4", lwd = 0.5)
+
+segments(0,0, coords[coords$level %in% c("Male", "Female"), 1], coords[coords$level %in% c("Male", "Female"), 2], col = "violetred2", lwd = 0.5)
+
+points(coords[,1:2], pch=rep(15:17, nlev), col=rep(cols, nlev), cex=1.2)
+text(coords[,1:2], label=coords$level, col=rep(cols, nlev), pos=rep(posn, nlev), 
+     cex=0.9, xpd=TRUE)
+
+lines(Dim2 ~ Dim1, data=coords, subset=factor=="Dept", lty=1, lwd=0.5, col="khaki4")
+
+legend("bottomright"
+       , legend=c("Admit", "Gender", "Dept")
+       , title="Factor", title.col="black"
+       , col=cols, text.col=cols, pch=15:17
+       , bg="gray95", cex=1.2)
+```
+
+(c)	Interpret the plot. Is there some interpretation for the first dimension? What does the plot show about the relation of admission to the other factors?
+
+*The first dimension separates both Admitted and Gender = Male, as well as Depts A & B. Given all the previous work with this dataset, this can be related to the high number of male applications to departments A & B which also have high acceptance rates. The reverse of these observations are seen on the left side of the dimension.*

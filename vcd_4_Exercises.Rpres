@@ -1,0 +1,437 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r}
+require(vcd)
+require(vcdExtra)
+require(ggplot2)
+oldpar <- par()
+```
+
+========================================================
+author: Julian Hatwell
+date: `r Sys.Date()`
+
+4.1
+========================================================
+The data set fat, created below, gives a 2 × 2 table recording the level of cholesterol in diet and the presence of symptoms of heart disease for a sample of 23 people.
+
+```{r}
+fat <- matrix(c(6,4,2,11), 2, 2)
+dimnames(fat) <- list(diet = c("loChol", "HiChol")
+                      , disease = c("No", "Yes"))
+fat
+```
+
+4.1 (a)
+=================================================
+Use chisq.test(fat) to test for association between diet and disease. Is there any indication that this test may not be appropriate here?
+
+```{r}
+chisq.test(fat)
+```
+
+*This test returns a (just) non-significant $\chi^2$ value, although the data clearly suggest non-independence. An odds ratio or log odds ratio would be more appropriate, given the 2x2 structure.*
+
+4.1 (b)
+=================================================
+Use a fourfold display to test this association visually. Experiment with the different options for standardizing the margins, using the margin argument to fourfold(). What evidence is shown in different displays regarding whether the odds ratio differs significantly from 1?
+
+```{r, fig.width=3, fig.height=4}
+fourfold(fat, std = "ind.max", main = "unstandardised", space = 0.3, fontsize = 20)
+fourfold(fat, margin = 1, main = "m1 standardised", space = 0.3, fontsize = 20)
+fourfold(fat, margin = 2, main = "m2 standardised", space = 0.3, fontsize = 20)
+fourfold(fat, main = "standardised", space = 0.3, fontsize = 20)
+```
+
+4.1 (b) cont'd
+=================================================
+*Only the standardised plot can be used to rate the significance of the log odds ratio on both directions. It is significantly different from 1 even with wide confidence intervals.*
+
+4.1 (c)
+==============================
+oddsratio(fat, log = FALSE) will give you a numerical answer. How does this compare to your visual impression from fourfold displays?
+
+```{r}
+oddsratio(fat, log = FALSE)
+```
+
+*This function call result returns the odds ratio, while the fourfold plot represents the log odds ratio. Visually the larger quadrants are about twice the size of the smaller quadrants, so expectation is a log odds ratio $\approx$ 2.*
+
+*Log(8.25) = `r log(8.25)`*
+
+4.1 (d)
+==========================
+With such a small sample, Fisher's exact test may be more reliable for statistical inference. Use fisher.test (fat), and compare these results to what you have observed before.
+
+```{r}
+ftf <- fisher.test(fat)
+cat("p value", ftf$p.value)
+cat("conf int", ftf$conf.int)
+cat("estimate", ftf$estimate)
+```
+
+*Note the enormous confidence interval, which does not contain zero. Odds ratio is slightly smaller than the non-exact estimate.*
+
+4.1 (e)
+======================================
+Write a one-paragraph summary of your findings and conclusions for this data set.
+
+*Taking the fisher exact test results, evidence suggests an odds ratio of 7.4, i.e. 7.4 times more likely to be disease category given a HiChol diet.*
+
+4.2 
+===================================
+The data set Abortion in vcdExtra gives a 2 × 2 × 2 table of opinions regarding abortion in relation to sex and status of the respondent. This table has the following structure:
+
+```{r}
+data("Abortion", package = "vcdExtra")
+str(Abortion)
+```
+
+4.2 (a)
+===================================
+(a)	Taking support for abortion as the outcome variable, produce fourfold displays showing the association with sex, stratified by status.
+
+```{r, fig.width=16, fig.height=8}
+Aba <- aperm(Abortion, c(1,3,2))
+fourfold(Aba, space = 0.3, fontsize = 20)
+```
+
+4.2 (b)
+==========================================
+Do the same for the association of support for abortion with status, stratified by sex.
+
+```{r, fig.width=16, fig.height=8}
+Abb <- aperm(Abortion, c(2,3,1))
+fourfold(Abb, space = 0.3, fontsize = 20)
+```
+
+4.2 (c)
+=========================================
+For each of the problems above, use oddsratio() to calculate the numerical values of the odds ratio, as stratified in the question.
+
+```{r}
+(Ora <- oddsratio(Aba, log =FALSE))
+(Orb <- oddsratio(Abb, log =FALSE))
+```
+
+*Ratios (log = FALSE) are given*
+
+4.2 (c) cont'd
+======================
+
+```{r}
+confint(Ora)
+confint(Orb)
+```
+
+4.2 (d)
+=================================
+Write a brief summary of how support for abortion depends on sex and status.
+
+*Odds ratio between women's and men's support for abortion is not significantly different from 1 in the high status group, but is $\approx$ 2 in the low status group (men in this group are twice as likely not to support abortion as women in the same group).*
+
+*Odds ratio among men's support for abortion is not significantly different from 1 between the two status groups, but for women is $\approx$ 1.75 comparing the low status group to the high status group (women in the low status group are 1.75 times more likely to support abortion than those in the high status group).*
+
+4.3
+===================================
+The JobSat table on income and job satisfaction created in Example 2.5 is contained in the vcdExtra package.
+
+```{r}
+data("JobSat", package = "vcdExtra")
+JobSat
+```
+
+4.3 (a)
+====================================
+Carry out a standard χ2 test for association between income and job satisfaction. Is there any indication that this test might not be appropriate? Repeat this test using simulate.p.value = TRUE to obtain a Monte Carlo test that does not depend on large sample size. Does this change your conclusion?
+
+```{r}
+chisq.test(JobSat)
+```
+
+*The test suggests independence between the variables, with or without simulation. This may not be correct.*
+
+4.3 (b)
+===========================
+Both variables are ordinal, so CMH tests may be more powerful here. Carry out that analysis. What do you conclude?
+
+```{r}
+CMHtest(JobSat)
+```
+
+4.3 (b)
+===========================
+*The General Association test is similar to $\chi^2$ which has not been conclusive. Only the results are significant for the Nonzero correlation test, indicating a linear association.*
+
+```{r}
+sieve(JobSat, shade = TRUE, gp = shading_sieve(interpolate = 0, lty = c("solid", "longdash")))
+```
+
+4.4
+===========================
+The Hospital data in vcd gives a 3 × 3 table relating the length of stay (in years) of 132 long-term schizophrenic patients in two London mental hospitals with the frequency of visits by family and friends.
+
+```{r}
+data("Hospital", package = "vcd")
+Hospital
+```
+
+4.4 (a)
+==========================
+Carry out a χ2 test for association between the two variables.
+
+```{r}
+chisq.test(Hospital)
+```
+
+*This is a significant test result indicating that the variables are not independent.*
+
+4.4 (b)
+==========================
+Use assocstats() to compute association statistics. How would you describe the strength of association here?
+
+```{r}
+assocstats(Hospital)
+```
+
+*From the Cramer's V statistic which varies from 0 (no association) to 1 (perfect association) there appears to be a moderate association between the variables.*
+
+4.4 (c)
+=========================
+Produce an association plot for these data, with visit frequency as the vertical variable. Describe the pattern of the relation you see here.
+
+```{r}
+assoc(Hospital, shade = TRUE)
+```
+
+4.4 (d)
+============================
+Both variables can be considered ordinal, so CMHtest() may be useful here. Carry out that analysis. Do any of the tests lead to different conclusions?
+
+```{r}
+CMHtest(Hospital)
+```
+
+4.4 (conclusions)
+
+*The cases tend toward more, frequent shorter visits or rare longer visits. Although the Pearson't residuals in the plot never exceed 4 (saturated colouring).*
+
+*All the CMH tests are highly significant. The tests indicate that there are general and linear associations.*
+
+4.5
+==================================
+Continuing with the Hospital data:
+
+(a)	Try one or more of the following other functions for visualizing two-way contingency tables with this data: plot(), tile(), mosaic(), and spineplot(). [For all except spineplot(), it is useful to include the argument shade=TRUE].
+
+(b)	Comment on the differences among these displays for understanding the relation between visits and length of stay.
+
+4.5 Tile
+===================
+```{r}
+tile(Hospital, shade = TRUE)
+```
+
+4.5 Mosaic
+=============================
+```{r}
+mosaic(Hospital, shade = TRUE)
+```
+
+4.5 Spine
+=======================
+```{r}
+spine(t(Hospital))
+```
+
+4.5 Notes
+==========================
+*Each plot type has it's strengths and emphaisis. The assocplot focuses on the scale of the magnitude of the differences from expected. The spine plot highlights the trend across the groups. The mosaic appears to pick out a similarity in the "less than monthly" and the "Never" groups' length of stay.*
+
+4.6
+=========================
+The two-way table Mammograms in vcdExtra gives ratings on the severity of diagnosis of 110 mammograms by two raters.
+
+```{r}
+data("Mammograms", package = "vcdExtra")
+Mammograms
+```
+
+4.6 (a)
+================================
+Assess the strength of agreement between the raters using Cohen's κ, both unweighted and weighted.
+
+```{r}
+CK <- Kappa(Mammograms, weights = "Fleiss-Cohen")
+CK
+confint(CK)
+```
+
+4.6 (b)
+===============================
+Use agreementplot() for a graphical display of agreement here.
+
+```{r}
+agreementplot(Mammograms)
+```
+
+4.6 (c)
+======================
+Compare the Kappa measures with the results from assocstats(). What is a reasonable interpretation of each of these measures?
+
+```{r}
+assocstats(Mammograms)
+```
+
+4.6 Interpretation
+======================
+*The assocstats results report a strong association between the variables. However this is expected due to the nature of the data set (2 ratings on the same cases).*
+
+*The Kappa is a more useful measure for this kind of data as it reports on the level of agerement of the two raters and it's possible to consider complete agreement and partial (out by one level) agreement using weightings.*
+
+4.7
+===============================
+Agresti and Winner (1997) gave the data in Table 4.8 on the ratings of 160 movies by the reviewers Gene Siskel and Roger Ebert for the period from April 1995 through September 1996. The rating categories were Con (“thumbs down”), Mixed, and Pro (“thumbs up”).
+
+```{r}
+MovieRating <- matrix(c(24,8,13,8,13,11,10,9,64), nrow = 3, byrow = TRUE)
+ratings <- c("Con", "Mixed","Pro")
+dimnames(MovieRating) <- list(Siskel = ratings, Ebert = ratings)
+MovieRating
+```
+
+4.7 (a)
+================================
+(a)	Assess the strength of agreement between the raters using Cohen's κ, both unweighted and weighted.
+
+```{r}
+Kappa(MovieRating, weights = "Fleiss-Cohen")
+```
+
+*There exists agreement between the two raters, but they are only moderately aligned even under the weighted measure.*
+
+4.7 (b)
+============================
+Use agreementplot() for a graphical display of agreement here.
+
+```{r}
+agreementplot(MovieRating)
+```
+
+4.7 (c)
+===============================
+Assess the hypothesis that the ratings are symmetric around the main diagonal, using an appropriate χ2 test. Hint: Symmetry for a square table T means that tij = tji for i ≠ j. The expected frequencies under the hypothesis of symmetry are the average of the off-diagonal cells, E = (T + TT)/2.
+
+```{r}
+offDiag <- MovieRating[!(row(MovieRating) == col(MovieRating))]
+chisq.test(offDiag)
+```
+
+*This $\chi^2$ result for the off diagonal elements gives no evidence that these differ significantly from expected values. The Null hypothesis holds that these elements are independently distributed.*
+
+4.7 (d)
+======================
+Compare the results with the output of mcnemar.test().
+
+```{r}
+mcnemar.test(MovieRating)
+```
+
+*These results show a no evidence at all for a lack of symmetry. The statistic is very close to the chi square but more significant as there are few DF.*
+
+4.8
+==================
+For the VisualAcuity data set:
+
+(a) Use the code shown in the text to create the table form, VA.tab.
+
+```{r}
+data("VisualAcuity", package = "vcd")
+VA <- xtabs(Freq ~ right + left + gender, data = VisualAcuity)
+dimnames(VA)[1:2] <- list(c("high", 2, 3, "low"))
+names(dimnames(VA))[1:2] <- paste(c("Right", "Left"), "eye grade")
+VA
+```
+
+4.8 (b)
+===================================
+Perform the CMH tests for this table.
+
+*Combined male and female results*
+
+```{r}
+CMHtest(margin.table(VA, margin = c(1,2)))
+```
+
+4.8 (b) cont'd
+===================================
+Perform the CMH tests for this table.
+
+*Male results*
+
+```{r}
+CMHtest(VA[,,"male"])
+```
+
+4.8 (b)
+===================================
+Perform the CMH tests for this table.
+
+*Female results*
+
+```{r}
+CMHtest(VA[,,"female"])
+```
+
+4.8 (c)
+==================================
+Use the woolf_test() described in Section 4.3.2 to test whether the association between left and right eye acuity can be considered the same for men and women.
+
+```{r}
+woolf_test(VA)
+```
+
+*There is no evidence of difference between men and women. CMH test is sensitive to number of readings in each stratum.*
+
+4.9
+==============================
+The graph in Figure 4.23 may be misleading, in that it doesn't take into account of the differing capacities of the 18 life boats on the Titanic, given in the variable cap in the Lifeboats data.
+
+(a)	Calculate a new variable, pctloaded, as the percentage loaded relative to the boat capacity.
+
+(b)	Produce a plot similar to Figure 4.23, showing the changes over time in this measure.
+
+4.9 original plot
+============================
+
+```{r}
+ggplot(data = Lifeboats,
+       aes(x=launch, y=total, colour=side,  label=boat)) +
+  geom_smooth(method="lm", aes(fill=side), size=1.5) +
+  geom_smooth(method="loess", aes(fill=side), se=FALSE, size=1.2) +
+  geom_point() + ylim(c(0,100)) +
+  geom_text(vjust=-.5, color="black") +
+  labs(y="Total loaded", x="Launch time")
+```
+
+
+4.9 new plot
+==========================
+
+```{r}
+data("Lifeboats", package = "vcd")
+Lifeboats$pctloaded <- Lifeboats$total/Lifeboats$cap
+ggplot(data = Lifeboats,
+       aes(x=launch, y=pctloaded, colour=side,  label=boat)) +
+  geom_smooth(method="lm", aes(fill=side), size=1.5) +
+  geom_smooth(method="loess", aes(fill=side), se=FALSE, size=1.2) +
+  geom_point() + 
+  #ylim(c(0,100)) +
+  geom_text(vjust=-.5, color="black") +
+  labs(y="Total loaded", x="Launch time")
+```

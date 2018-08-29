@@ -27,7 +27,6 @@ xtxi <- summary(lmod)$cov.unscaled # solve(t(x) %*% x)
 sqrt(diag(xtxi)) * summary(lmod)$sigma # coefficient SE * RSE
 summary(lmod)$coef[, 2]
 
-
 data(odor, package = "faraway")
 odor
 cov(odor[, -1])
@@ -36,57 +35,73 @@ summary(lmod, cor=TRUE)
 
 apply(FUN=sum, odor[, -1], 1)
 
+# exercises
+library(faraway)
+library(lattice)
+data("teengamb")
+splom(teengamb)
+splom(teengamb, groups = teengamb$sex)
+
 lmod <- lm(gamble ~ sex + status + verbal + income, data = teengamb)
-sumary(lmod)
-# r.squared = 1 - RSS / mean centred values
+sumary(lmod) # r.squared = 0.53
+# r.squared = 1 - (RSS / TSS)
 1 - sum((lmod$fitted.values - teengamb$gamble)^2) / sum((teengamb$gamble - mean(teengamb$gamble))^2)
 1 - deviance(lmod) / sum((teengamb$gamble - mean(teengamb$gamble))^2)
 
+#largest resid
+which.max(abs(resid(lmod)))
 which.max(abs(teengamb$gamble - lmod$fitted.values))
-which.max(resid(lmod))
+
 mean(resid(lmod)) # effectively zero
 median(resid(lmod))
 cor(resid(lmod), fitted(lmod)) # effectively zero, randomly distributed around the least squares line
 cor(resid(lmod), teengamb$income) # effectively zero
 coef(lmod)[2]
 
+data("uswages")
 lmod <- lm(wage ~ exper + educ, data = uswages)
 sumary(lmod)
 lmod <- lm(log(wage) ~ exper + educ, data = uswages)
 sumary(lmod)
 
 set.seed(201)
-x <- 1:20
-y <- x + rnorm(20)
+x <-1:20
 x <- model.matrix(~ x + I(x^2))
-
+x <- model.matrix(~ x + I(x^2) + I(x^3))
+x <- model.matrix(~ x + I(x^2) + I(x^3) + I(x^4))
+x <- model.matrix(~ x + I(x^2) + I(x^3) + I(x^4) + I(x^5))
 xtxi <- solve(t(x) %*% x)
 bhat <- xtxi %*% t(x) %*% y
 bhat <- solve(crossprod(x, x), crossprod(x, y))
+bhat
 
-lmod <- lm(y ~ x.mod.mat)
+lmod <- lm(y ~ x)
 sumary(lmod)
 
-x <- model.matrix(~ x + I(x^2) + I(x^3))
-
-xtxi <- solve(t(x) %*% x) # does not solve.
 
 predictors <- c("lpsa", "lweight", "svi", "lbph", "age", "lcp", "pgg45", "gleason")
 rsq <- numeric(length(predictors))
-fmla <- "lcavol ~ lpsa"
+rse <- numeric(length(predictors))
+fmla <- "lcavol ~ "
 
 for (i in seq_along(predictors)) {
+  fmla <- paste(fmla, "+", predictors[i])
   lmod <- lm(as.formula(fmla), data = prostate)
   rsq[i] <- summary(lmod)$r.squared
-  if(i == max(seq_along(predictors))) break
-  fmla <- paste(fmla, "+", predictors[i + 1])
+  rse[i] <- summary(lmod)$sigma
 }
 plot(rsq, type = "l"
-     , xlab = "Number of predictors")
+     , xlab = "Number of predictors"
+     , ylim = c(min(min(rse), min(rsq)),max(max(rse), max(rsq))))
+lines(rse, lty=2, col="blue")
 
 plot(lcavol~lpsa, data = prostate)
-abline(lm(lcavol~lpsa, data = prostate), col = "red")
-abline(lm(lpsa~lcavol, data = prostate), col = "green") # it's parallel!
+abline(lm(lcavol~lpsa, data = prostate), col = "blue")
+# can't do abline because the coordinates are reversed
+lines(cbind(sort(fitted(lm(lpsa~lcavol, data = prostate))))
+      , prostate$lcavol[order(fitted(lm(lpsa~lcavol, data = prostate)))]
+      , col = "green")
+points(mean(lcavol)~mean(lpsa), data = prostate, pch = 3, col = "red")
 
 lched <- lm(taste ~ Acetic + H2S + Lactic, data = cheddar)
 sumary(lched)
@@ -95,14 +110,54 @@ cor(cheddar$taste # response
 
 lched <- lm(taste ~ Acetic + H2S + Lactic - 1, data = cheddar)
 sumary(lched) # when the intercept is ommitted, 
-# r.squared is wrong in the lm summary
+# r.squared is diferent in the lm summary
 
 cor(cheddar$taste # however, this calculation is correct
     , lched$fitted.values)^2 # this is equal to the r.squared stat
 
+x <- cheddar[, - 1]
+y <- cheddar[, 1]
+qrx <- qr(x)
+qr.Q(qrx)
+f <- t(qr.Q(qrx)) %*% y
+backsolve(qr.R(qrx), f)
+
 x <- model.matrix(~ x1 + x2 + x3 + x4, data = wafer)
-lmod <- lm(resist ~ x, data = wafer)
+cov(x[, -1]) # orthogonal matrix
+lmod <- lm(resist ~ ., data = wafer)
 sumary(lmod)
 x <- model.matrix(~ x1 + x2 + x3, data = wafer)
-lmod <- lm(resist ~ x, data = wafer)
+cov(x[, -1])
+lmod <- lm(resist ~ . - x4, data = wafer)
 sumary(lmod)
+
+coef(lmod)[2]
+# the intercept changes but essentially everything else stays the same
+# the matrix is orthogonal so variables do not affect one another
+
+data("truck")
+tr <- truck
+str(tr)
+# recode
+for (fac in c("B", "C", "D", "E", "O")) {
+  tr[[fac]] <- sapply(tr[[fac]], function(x) {ifelse(x=="-", -1, 1)})
+}
+x <- model.matrix(height ~ ., data = tr)
+cov(x[, -1])
+lmod <- lm(height ~ ., data = tr)
+sumary(lmod)
+lmod <- lm(height ~ . - O, data = tr)
+sumary(lmod) # same as before - orthogonal matrix means no colinearity
+tr$A <- apply(tr[, -(5:6)], 1, sum)
+lmod <- lm(height ~ ., data = tr)
+sumary(lmod) # A is a lineary combo as does not appear - adds no information
+
+y <- tr$height
+x <- model.matrix(height ~ ., data = tr)
+xtxi <- solve(t(x) %*% x)
+
+qrx <- qr(x)
+qr.Q(qrx)
+f <- t(qr.Q(qrx)) %*% y
+backsolve(qr.R(qrx), f)
+qr.coef(qrx, y)

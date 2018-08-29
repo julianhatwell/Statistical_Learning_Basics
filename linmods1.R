@@ -18,6 +18,8 @@ lmod <- lm(childHeight ~ midparentHeight, GaltonFamilies)
 coef(lmod)
 abline(lmod)
 
+
+correl  <- with(GaltonFamilies, cor(childHeight, midparentHeight))
 beta <- with(GaltonFamilies
              , cor(midparentHeight
                    , childHeight) *

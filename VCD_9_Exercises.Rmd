@@ -1,0 +1,242 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo = FALSE
+                      )
+```
+
+```{r setup}
+require(vcd)
+require(vcdExtra)
+require(MASS)
+```
+
+---
+title: "VCD Exercise 9"
+author: "Julian Hatwell"
+date: "March 29, 2016"
+output: html_document
+---
+
+9.1 Consider the data set DaytonSurvey (described in Example 2.6), giving results of a survey of use of alcohol (A), cigarettes (C), and marijuana (M) among high school seniors. For this exercise, ignore the variables sex and race, by working with the marginal table Dayton.ACM, a 2 × 2 × 2 table in frequency data frame form.
+
+```{r, echo=TRUE}
+Dayton.ACM <- aggregate(Freq ~ cigarette + alcohol + marijuana, data = DaytonSurvey, FUN = sum)
+structable(~cigarette + alcohol + marijuana, Dayton.ACM)
+```
+
+(a)	Use loglm () to fit the model of mutual independence, [A][C][M].
+
+```{r}
+day.llm0 <- loglm(Freq~cigarette + alcohol + marijuana
+                 , data = DaytonSurvey
+                 , param = TRUE
+                 , fitted = TRUE)
+day.llm0
+
+print("Fitted Frequencies")
+round(structable(~cigarette + alcohol + marijuana
+           , fitted(day.llm0)),0)
+```
+
+(b)	Prepare mosaic display(s) for associations among these variables. Give a verbal description of the association between cigarette and alcohol use.
+
+```{r}
+mosaic(round(structable(~cigarette + alcohol + marijuana
+           , fitted(day.llm0)),0)
+       , main = "Model: [Alcohol][Cigarettes][Marijuana]"
+       , labeling = labeling_values)
+
+mosaic(structable(Freq~cigarette + alcohol + marijuana
+                  , Dayton.ACM)
+       , shade = TRUE
+       , main = "Observed Frequencies"
+       , labeling = labeling_values
+       , legend = FALSE)
+```
+
+(c)	Use fourfold () to produce fourfold plots for each pair of variables, AC, AM, and CM, stratified by the remaining one. Describe these associations verbally.
+
+```{r}
+Dayton.dft <- expand.dft(Dayton.ACM)
+Dayton.tab <- table(Dayton.dft)
+fourfold(Dayton.tab)
+fourfold(aperm(Dayton.tab, c(1,3,2)))
+fourfold(aperm(Dayton.tab, c(3,2,1)))
+```
+
+*It appears as though each variable is strongly associated with the other regardless of the third. Specifically, if you use cigarettes, you are much more likely to use alcohol, regardelss of marijuana use. If you use marijuana, you are much more likely to use cigarettes regardless of alcohol use. If you use alcohol you are much more likely to use marijuana, regardless of cigarette use. The same holds in every direction.*
+
+## 9.2 Continue the analysis of the DaytonSurvey data by fitting the following models:
+
+(a)	Joint independence, [AC][M]
+
+*Adding the mutual independence model with glm first.*
+
+```{r}
+day.glm0 <- glm(Freq~cigarette + alcohol + marijuana
+                , data = DaytonSurvey
+                , family = poisson)
+day.glm0
+```
+
+*Now the joint model.*
+
+```{r}
+day.glm1 <- glm(Freq~cigarette * alcohol + marijuana
+                , data = DaytonSurvey
+                , family = poisson)
+day.glm1
+```
+
+(b)	Conditional independence, [AM][CM]
+
+```{r}
+day.glm2 <- glm(Freq~(cigarette + alcohol) * marijuana
+                , data = DaytonSurvey
+                , family = poisson)
+day.glm2
+```
+
+(c)	Homogeneous association, [AC][AM][CM]
+
+```{r}
+day.glm3 <- glm(Freq~(cigarette + alcohol + marijuana)^2
+                , data = DaytonSurvey
+                , family = poisson)
+day.glm3
+```
+
+*Adding the saturated model*
+
+```{r}
+day.glm4 <- glm(Freq~(cigarette + alcohol + marijuana)^3
+                , data = DaytonSurvey
+                , family = poisson)
+day.glm4
+```
+
+(d)	Prepare a table giving the goodness-of-fit tests for these models, as well as the model of mutual independence, [A][C][M], and the saturated model, [ACM]. Hint: anova() and LRstats() are useful here. Which model appears to give the most reasonable fit?
+
+```{r}
+anova(day.glm4, test = "Chisq")
+anova(day.glm0, day.glm1, day.glm2, day.glm3, day.glm4)
+LRstats(day.glm0, day.glm1, day.glm2, day.glm3, day.glm4)
+```
+
+*The homogenous dependency model appears to be the best one. The three-way interaction term adds very little.*
+
+## 9.3 
+The data set Caesar in vcdExtra gives a 3 × 23 frequency table classifying 251 women who gave birth by Caesarian section by Infection (three levels: none, Type 1, Type2) and Risk, whether Antibiotics were used, and whether the Caesarian section was Planned or not. Infection is a natural response variable, but the table has quite a few zeros.
+
+```{r}
+data("Caesar", package = "vcdExtra")
+```
+
+(a)	Use structable() and mosaic() to see the locations of the zero cells in this table.
+
+```{r}
+structable(Antibiotics+Planned~Risk+Infection, Caesar)
+mosaic(structable(Antibiotics+Planned~Infection+Risk
+                  , Caesar)
+       , shade = TRUE
+       , legend = FALSE
+       , rot_labels = c(0,0,90,0)
+       , offset_labels = c(0,0,0,0.5)
+       , offset_varnames = c(0,0,0,0)
+       )
+```
+
+(b)	Use loglm() to fit the baseline model [I][RAP]. Is there any problem due to zero cells indicated in the output?
+
+```{r}
+caes.llm1 <- loglm(~ (Antibiotics * Planned * Risk) + Infection
+                 , Caesar
+                 , param = TRUE
+                 , fitted = TRUE)
+
+caes.llm1
+```
+
+*The Pearson resids are NaN*
+
+(c)	For the purpose of this excercise, treat all the zero cells as sampling zeros by adding 0.5 to all cells, e.g., Caesarl <- Caesar + 0.5. Refit the baseline model.
+
+```{r}
+caesnz <- Caesar + 0.5
+caes.llm1a <- loglm(~ (Antibiotics * Planned * Risk) + Infection
+                 , caesnz
+                 , param = TRUE
+                 , fitted = TRUE)
+
+caes.llm1a
+```
+
+
+(d)	Now fit a “main effects” model [IR][IA][IP][RAP] that allows associations of Infection with each of the predictors.
+
+```{r}
+caes.llm2 <- loglm(~ (Antibiotics * Planned * Risk) + (Antibiotics + Planned + Risk) * Infection
+                 , caesnz
+                 , param = TRUE
+                 , fitted = TRUE)
+
+caes.llm2
+anova(caes.llm1a, caes.llm2)
+
+caes.llm3 <- loglm(~ (Antibiotics * Planned * Risk * Infection)^3 - Antibiotics:Planned:Infection - Antibiotics:Risk:Infection - Risk:Planned:Infection - Antibiotics:Planned:Risk:Infection
+                 , caesnz
+                 , param = TRUE
+                 , fitted = TRUE)
+caes.llm3
+```
+
+*These two are equivalent*
+
+## 9.4 
+The Detergent in vcdExtra gives a 23 × 3 table classifying a sample of 1,008 consumers according to their preference for (a) expressed Preference for Brand “X” or Brand “M” in a blind trial, (b) Temperature of laundry water used, (c) previous use (M_user) of detergent Brand “M,” and (d) the softness (Water_softness) of the laundry water used.
+
+```{r}
+data("Detergent", package = "vcdExtra")
+```
+
+(a)	Make some mosaic displays to visualize the associations among the table variables. Try using different orderings of the table variables to make associations related to Preference more apparent.
+
+*For reference here is the structable*
+
+```{r}
+structable(M_User+Water_softness~Temperature+Preference
+                  , data = Detergent)
+
+mosaic(aperm(Detergent, c(3,1,2,4))
+       , gp = shading_Friendly2
+       , legend = FALSE)
+mosaic(aperm(Detergent, c(3,2,1,4))
+       , gp = shading_Friendly2
+       , legend = FALSE)
+mosaic(aperm(Detergent, c(3,4,1,2))
+       , gp = shading_Friendly2
+       , legend = FALSE)
+```
+
+(b)	Use a doubledecker () plot to visualize how Preference relates to the other factors.
+
+```{r}
+doubledecker(aperm(Detergent, c(1,4,2,3)))
+```
+
+(c)	Use loglm() to fit the baseline model [P][TMW] for Preference as the response variable. Use a mosaic display to visualize the lack of fit for this model.
+
+```{r}
+det.llm <- loglm(~ Preference + (Temperature * M_User * Water_softness)
+                , data = Detergent
+                , param = TRUE
+                , fitted = TRUE)
+det.llm
+mosaic(Detergent, expected = det.llm$fitted
+       , gp = shading_Friendly2)
+
+# same
+# mosaic(det.llm, formula = M_User+Water_softness~Temperature+Preference
+#        , gp = shading_Friendly2)
+```

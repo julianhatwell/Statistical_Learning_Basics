@@ -1,0 +1,203 @@
+```{r prologue, results='hide', echo=FALSE}
+knitr::opts_chunk$set(warning = FALSE
+                      , message = FALSE
+                      , echo=TRUE
+                      , fig.show='hold'
+                      )
+knitr::opts_template$set(
+  fig.tile = list(fig.height = 5, fig.width = 4.5)
+)
+
+require(factoextra)
+require(FactoMineR)
+require(knitr)
+```
+
+# A look at the factoextra package
+```{r vizPCA, opts.label='fig.tile'}
+res.pca <- PCA(iris[, -5],graph = FALSE)
+# extract and visualise eigenvalues and var as a scree plot
+get_eig(res.pca)
+fviz_eig(res.pca, choice = "eigenvalue" 
+         , addlabels=TRUE, hjust = -0.3) +
+  theme_minimal()
+
+fviz_eig(res.pca, choice = "variance"
+         , geom = "bar"
+         , addlabels=TRUE
+         , ncp = 2
+         , barfill = "darkorchid"
+         , barcolor = "green") +
+  theme_minimal()
+```
+
+```{r extract_PCA_values, opts.label='fig.tile'}
+var <- get_pca_var(res.pca)
+var
+var$coord
+var$contrib
+
+fviz_pca_var(res.pca
+             , col.var="contrib"
+             , repel = TRUE) +
+scale_color_gradient2(low="black"
+                      , mid="blue"
+                      , high="red"
+                      , midpoint = 96) +
+theme_minimal()
+fviz_pca_var(res.pca
+             , col.var="coord"
+             , repel = TRUE) +
+theme_minimal()
+
+```
+
+```{r var_PCA_contribution, opts.label='fig.tile'}
+fviz_contrib(res.pca, choice="var", axes = 1 )+
+  labs(title = "Contributions to Dim 1")
+
+# Variable contributions on axes 1 + 2
+fviz_contrib(res.pca, choice="var"
+             , axes = 1:2
+             , fill = "darkorchid") +
+  labs(title = "Contributions to Dim 1+2")
+```
+
+```{r indiv_PCA_contribution, opts.label='fig.tile'}
+ind <- get_pca_ind(res.pca)
+ind
+head(ind$coord)
+
+fviz_pca_ind(res.pca
+             , repel = TRUE
+             , col.ind = "cos2") +
+  scale_color_gradient2(low="wheat", mid="orange",
+      high="darkorchid", midpoint=0.65)+
+  theme_minimal()
+
+p <- fviz_pca_ind(res.pca
+                  , geom = "point"
+                  , habillage=iris$Species
+                  , addEllipses=TRUE
+                  , ellipse.level= 0.95) + 
+  theme_minimal()
+p + scale_color_manual(values=c("#999999", "#E69F00", "#56B4E9"))+
+ scale_fill_manual(values=c("#999999", "#E69F00", "#56B4E9"))
+
+ fviz_pca_biplot(res.pca,  label="var", habillage=iris$Species,
+      addEllipses=TRUE, ellipse.level=0.95) +
+  theme_minimal()
+```
+
+```{r vizCA, opts.label='fig.tile'}
+head(housetasks)
+res.ca <- CA(housetasks, graph = FALSE)
+get_ca_row(res.ca)
+get_ca_col(res.ca)
+
+fviz_contrib(res.ca, choice ="row", axes = 1)
+fviz_contrib(res.ca
+             , choice ="col"
+             , axes = 1
+             , fill = "darkorchid")
+```
+
+```{r, rowcol_CA_contrib, opts.label='fig.tile'}
+fviz_ca_row(res.ca, repel = TRUE)
+fviz_ca_col(res.ca) + theme_minimal()
+fviz_ca_biplot(res.ca, repel = TRUE)
+```
+
+```{r vizMCA}
+head(poison)
+res.mca <- MCA(poison, quanti.sup = 1:2,
+              quali.sup = 3:4, graph=FALSE)
+get_mca_var(res.mca)
+get_mca_ind(res.mca)
+
+fviz_contrib(res.mca, choice ="var", axes = 1)
+
+# Visualize individual contributions on axes 1
+# select the top 20
+fviz_contrib(res.mca
+             , choice ="ind"
+             , axes = 1
+             , top = 20
+             , fill = "darkorchid") + theme_minimal()
+```
+
+```{r indiv_MCA, opts.label='fig.tile'}
+grp <- as.factor(poison[, "Vomiting"])
+fviz_mca_ind(res.mca
+             , col.ind = "blue"
+             , habillage = grp
+             , addEllipses = TRUE
+             , repel = TRUE) +
+   theme_minimal()
+
+fviz_mca_var(res.mca
+             , repel = TRUE)
+
+# Select the top 10 contributing variable categories
+fviz_mca_var(res.mca, select.var = list(contrib = 10))
+# Select by names
+fviz_mca_var(res.mca,
+ select.var= list(name = c("Courg_n", "Fever_y", "Fever_n")))
+```
+
+```{r biplot_MCA, opts.label='fig.tile'}
+fviz_mca_biplot(res.mca, repel = TRUE)+
+  theme_minimal()
+fviz_mca_biplot(res.mca,
+               select.ind = list(contrib = 30),
+               select.var = list(contrib = 10))
+```
+
+```{r vizMFA, opts.label='fig.tile'}
+data("wine")
+res.mfa <- MFA(wine, group=c(2,5,3,10,9,2)
+               , type=c("n",rep("s",5))
+               , ncp=5
+               ,  name.group=c("orig"
+                               , "olf"
+                               , "vis"
+                               , "olfag"
+                               , "gust"
+                               , "ens")
+               , num.group.sup=c(1,6)
+               , graph=FALSE)
+
+fviz_mfa_ind(res.mfa)
+# Graph of partial individuals (starplot)
+fviz_mfa_ind_starplot(res.mfa
+                      , col.partial = "group.name"
+                      , repel = TRUE) +
+  scale_color_brewer(palette = "Dark2") +
+  theme_minimal()
+fviz_mfa_quanti_var(res.mfa, repel = TRUE)
+```
+
+```{r clus, opts.label='fig.tile'}
+data("USArrests")
+df <- scale(USArrests)
+
+p <- fviz_nbclust(df, kmeans, method = "gap_stat")
+p
+k <- which.max(p$data$gap)
+
+set.seed(123)
+km.res <- kmeans(df, k, nstart = 25)
+
+fviz_cluster(km.res, data = df) + 
+  theme_minimal() +
+  scale_color_manual(values = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07")) +
+  scale_fill_manual(values = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07")) +
+  labs(title= "Partitioning Clustering Plot")
+```
+
+```{r dend, opts.label='fig.tile'}
+res <- hcut(USArrests, k = k, stand = TRUE)
+fviz_dend(res, rect = TRUE, cex = 0.5,
+          k_colors = c("#00AFBB","#2E9FDF", "#E7B800", "#FC4E07"))
+```
+
