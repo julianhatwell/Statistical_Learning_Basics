@@ -2,6 +2,8 @@ library(vcd)
 library(vcdExtra)
 library(extracat)
 library(MASS)
+library(gmodels)
+library(ggplot2)
 hec <- margin.table(HairEyeColor, 2:1)
 tile(hec)
 fluctile(hec)
@@ -12,7 +14,7 @@ spineplot(mental)
 fluctile(mental)
 
 Berkeley <- margin.table(UCBAdmissions, 2:1)
-library(gmodels)
+
 CrossTable(Berkeley, prop.chisq = FALSE, prop.c = FALSE, 
            format = "SPSS")
 
@@ -256,9 +258,9 @@ ggtern(data = Lifeboats,
         #, axis.tern.vshift=unit(5,"mm")
         )
 ggplot(data = Lifeboats,
-       aes(x=launch, y=total, colour=side,  label=boat)) +
+       aes(x=as.POSIXct(launch), y=total, colour=side,  label=boat)) +
   geom_smooth(method="lm", aes(fill=side), size=1.5) +
-  geom_smooth(method="loess", aes(fill=side), se=FALSE, size=1.2) +
+  # geom_smooth(method="loess", aes(fill=side), se=FALSE, size=1.2) +
   geom_point() + ylim(c(0,100)) +
   geom_text(vjust=-.5, color="black") +
   labs(y="Total loaded", x="Launch time")
