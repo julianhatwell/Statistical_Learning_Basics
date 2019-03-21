@@ -24,6 +24,8 @@ library(boot) # cv.glm
 library(faraway) # compact lm summary "sumary" function
 library(caret) # useful tools for machine learning
 library(corrplot)
+
+connected <- TRUE
 # location of boiler plate utilities
 load_file_source("https://raw.githubusercontent.com/julianhatwell/Utilities/master/Utilities.R"
                  , "C:\\Dev\\Study\\R\\Utilities\\Utilities.R")
@@ -426,3 +428,4 @@ t.test(cv.error[,2], cv.error[,4]) # MAD
 #http://www.sciencedirect.com/science/article/pii/S0304380004001565
 
 #http://www.sciencedirect.com/science/article/pii/S0304380002002570
+

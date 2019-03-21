@@ -42,3 +42,4 @@ for (i in 1:nLayers) {
 #  neg.influence <- -apply(neg.influence, 1, sum)
 #  pos.influence <- apply(pos.influence, 1, sum)
 }
+
