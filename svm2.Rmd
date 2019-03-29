@@ -1,0 +1,124 @@
+---
+title: "svm2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(kernlab)
+library(lattice)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+
+Different kinds of kernel
+
+```{r}
+kerns <- c("vanilladot"
+           , "rbfdot"
+           , "polydot"
+           , "tanhdot"
+           , "laplacedot"
+           , "besseldot"
+           , "anovadot"
+           , "splinedot")
+
+kpars <- list(list()
+              , "automatic"
+              , list(degree = 2, scale = 1, offset = 0)
+              , list(scale = 1, offset = 0)
+              , list(sigma = 1)
+              , list(sigma = 1, order = 1, degree = 2)
+              , list(sigma = 1, degree = 2)
+              , list())
+```
+
+Toy examples. Linear separable. Quadratic. Bananas
+
+```{r}
+library(kernlab)
+set.seed(101)
+set1 <- matrix(rnorm(120), ncol = 2)
+set2 <- matrix(rnorm(120, mean = 4), ncol = 2)
+x3.1 <- x <- runif(60, -1.5, 1.5)
+x3.2 <- x3.1^2 + rnorm(60, mean = 3, sd = 0.5)
+set3 <- cbind(x3.1 * 2 + 4, x3.2 - 2)
+x4.2 <- -(x3.1^2 + rnorm(60, mean = -5, sd = 0.5))
+set4 <- cbind(x3.1 * 2 + 7, x4.2)
+
+
+xlin <- rbind(set1, set2)
+xquad <- rbind(set2, set3)
+xban <- rbind(set3, set4)
+y <- matrix(c(rep(1,60),rep(-1,60)))
+
+xs <- list(xlin, xquad, xban)
+```
+
+```{r}
+models <- list()
+for (i in seq_along(kerns)) {
+  models[[i]] <- list()
+  for (j in seq_along(xs)) {
+    models[[i]][[j]] <- ksvm(xs[[j]]
+                        , y
+                        , type="C-svc"
+                        , kernel = kerns[i]
+                        , kpar = kpars[[i]])
+    plot(models[[i]][[j]], data = xs[[j]])
+  }
+}
+```
+
+Calling attributes of a model
+
+```{r, results='hold'}
+svp <- models[[1]][[1]]
+alpha(svp)  # support vectors
+alphaindex(svp) # indices
+b(svp)      # intercept
+unlist(coef(svp)) # there are as many coeffs as there are support vectors
+xlin[unlist(alphaindex(svp)),]
+```
+
+Manually plotting a margin / boundary with base graphics
+
+```{r}
+plot(scale(xlin), col=y+2, pch=y+2, xlab="", ylab="")
+w <- colSums(coef(svp)[[1]] * xlin[unlist(alphaindex(svp)),])
+b <- b(svp)
+slope <- -w[2]/w[1]
+
+abline(b/w[1],-w[2]/w[1])
+abline((b+1)/w[1],-w[2]/w[1],lty=2)
+abline((b-1)/w[1],-w[2]/w[1],lty=2)
+```
+
+
+Plot func with lattice
+
+```{r}
+plotfunc <- function(m, x, y) {
+  w <- colSums(coef(m)[[1]] * x[unlist(alphaindex(m)),])
+  b <- b(m)
+  x <- scale(x)
+  xyplot(x[, 2]~x[, 1], col = factor(y), pch = y + 2
+      
+      , panel = function(x, y, col, pch) {
+          panel.xyplot(x, y, col = col)
+          panel.abline(b/w[1],-w[2]/w[1])
+          panel.abline((b+1)/w[1],-w[2]/w[1],lty=2)
+          panel.abline((b-1)/w[1],-w[2]/w[1],lty=2)
+  }
+       )
+}
+
+
+for (i in seq_along(kerns)) {
+  for (j in seq_along(xs)) {
+   plt <- plotfunc(models[[i]][[j]], xs[[j]], y) 
+   print(plt)
+  }
+}
+
+```
+

@@ -397,6 +397,55 @@ text(coords[,1:2], label=coords$level, col=rep(cols, nlev), pos=rep(c(1,4,3), nl
 
 *This plot is using some customisation to improve the visual language but it hasn't added any useful information.*
 
+```{r tv_updated}
+# create a multiple correspondence analysis
+TV3.mca <- mjca(TV3)
+res <- plot(TV3.mca)
+
+# this is all base R plot stuff
+# but needs a bit of manipulation
+cols <- c("blue", "black", "red")
+
+# "blank plot"
+res <- plot(TV3.mca, labels=0, pch='.', cex.lab=1.2)
+
+# combine Dims, factor names and levels
+coords <- data.frame(res$cols, TV3.mca$factors)
+
+# hard-coded from known number of levels
+# day, time, network
+nlev <- c(5,3,3)
+
+# everything needs to be in semantic order
+coords <- coords[ order(coords[,"factor"], coords[,"level"]), ]
+# quick fix for ordering
+coords$order <- c(5, 1, 4, 2, 3, 6, 7, 8, 11, 9, 10)
+coords <- coords[order(coords[, "order"]), ]
+
+# place the points
+points(coords[,1:2], pch=rep(16:18, nlev), col=rep(cols, nlev), cex=1.2)
+
+# place the text
+pos <- c(1,4,3)
+text(coords[,1:2], labels=coords$level, col=rep(cols, nlev), pos=rep(pos,nlev), cex=1.1, xpd=TRUE)
+
+# join things in sequence
+lines(Dim2 ~ Dim1, data=coords, subset=factor=="Day", lty=1, lwd=1, col="blue")
+lines(Dim2 ~ Dim1, data=coords, subset=factor=="Time",  lty=1, lwd=1, col="red")
+
+# add segement from the origin to channels
+nw <- subset(coords, factor=="Network")
+segments(0, 0, nw[,"Dim1"], nw[, "Dim2"], col = "black", lwd = 0.5, lty = 3)
+
+# add a legend
+legend("topright", legend=c("Day", "Time", "Network"),
+       title="Factor", title.col="black",
+       col=cols, text.col=cols, pch=16:18,
+       bg="gray95")
+```
+
+*This plot add significant customisation and reveals the very specific patterns for NBC Thursday 8pm, switching away, mostly to ABC at 9pm and switching back at 10pm. The Friends / Seinfeld effect. CBS has the lion's share on Monday and ABC has Wednesday and Friday.*
+
 ## 6.10 
 Refer to the MCA analysis of the PreSex data in Example 6.8. Use the stacking approach to analyze the stacked table with the combinations of premarital and extramarital sex in the rows and the combinations of gender and marital status in the columns. As suggested in the exercise above, you can use as.matrix (structable()) to create the stacked table.
 

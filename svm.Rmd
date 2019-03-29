@@ -1,6 +1,6 @@
 # Support Vector Machines
 
-## Support vector classifiers and separating planes
+## Support vector classifiers and separating hyper-planes
 
 First set up some sim data
 
@@ -363,8 +363,8 @@ sp3 <- mapply(sep.plane3, myGrid[,1], myGrid[,2])
 plot(myGrid, pch = 20, col = sp3, cex = 0.5)
 points(0,0, col = "red")
 points(-1,1, col = "red")
-points(2,2, col = "red")
-points(3,8, col = "red")
+points(2,2, col = "blue")
+points(3,8, col = "blue")
 ```
 
 ```{r}
@@ -417,7 +417,7 @@ ygrid <- predict(svm.lin.low,xgrid)
 plot(xgrid,col=as.character(ygrid),pch=20,cex=.2)
 
 # add all the points
-points(dt, col=y,pch=19)
+plot(xgrid,col=as.character(ygrid),pch=20,cex=.2)
 # mark the support vectors (from the training set)
 points(x.train[svm.lin.low$index,],pch=5,cex=2)
 
