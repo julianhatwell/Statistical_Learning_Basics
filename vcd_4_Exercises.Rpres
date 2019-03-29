@@ -411,7 +411,7 @@ The graph in Figure 4.23 may be misleading, in that it doesn't take into account
 
 ```{r}
 ggplot(data = Lifeboats,
-       aes(x=launch, y=total, colour=side,  label=boat)) +
+       aes(x=as.POSIXct(launch), y=total, colour=side,  label=boat)) +
   geom_smooth(method="lm", aes(fill=side), size=1.5) +
   geom_smooth(method="loess", aes(fill=side), se=FALSE, size=1.2) +
   geom_point() + ylim(c(0,100)) +
@@ -427,7 +427,7 @@ ggplot(data = Lifeboats,
 data("Lifeboats", package = "vcd")
 Lifeboats$pctloaded <- Lifeboats$total/Lifeboats$cap
 ggplot(data = Lifeboats,
-       aes(x=launch, y=pctloaded, colour=side,  label=boat)) +
+       aes(x=as.POSIXct(launch), y=pctloaded, colour=side,  label=boat)) +
   geom_smooth(method="lm", aes(fill=side), size=1.5) +
   geom_smooth(method="loess", aes(fill=side), se=FALSE, size=1.2) +
   geom_point() + 
