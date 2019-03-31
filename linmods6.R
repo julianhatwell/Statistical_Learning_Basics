@@ -272,6 +272,7 @@ ggplot(savings, aes(x=ddpi, y=sr)) +
   facet_grid(~status) +
   stat_smooth(method="lm")
 
+
 # exercises
 data("sat")
 fmla <- as.formula("total ~ expend + salary + ratio + takers")
@@ -315,7 +316,7 @@ sumary(lm(tail(residuals(lmod), n-1) ~
             head(residuals(lmod), n-1), -1))
 
 # lmtest package
-dwtest(total ~ expend + salary + ratio + takers
+dwtest(fmla
        , data = sat)
 
 # leverage
@@ -412,3 +413,878 @@ abline(0, coef(lmod)["ratio"])
 termplot(lmod
          , partial.resid = TRUE
          , terms = 1)
+
+
+# exercises
+data("teengamb")
+fmla <- as.formula("gamble~sex+status+income+verbal")
+lmod <- lm(fmla
+           , data = teengamb)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = teengamb)
+
+# leverage
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+teens <- rownames(teengamb)
+halfnorm(hatv, labs=teens
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(teengamb)*2), nrow(teengamb) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = teens
+         , ylab = "Cook's Distances")
+
+lmod1 <- lm(fmla
+            , data = teengamb
+            , subset = cook < max(cook))
+sumary(lmod)
+sumary(lmod1)
+
+plot(dfbeta(lmod)[,2]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.-sex)
+                  , data = teengamb))
+m <- residuals(lm(update(fmla, sex~.-sex)
+                  , data = teengamb))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["sex"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 1)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.- status)
+                  , data = teengamb))
+m <- residuals(lm(update(fmla, status~.-status)
+                  , data = teengamb))
+
+plot(m, d
+     , xlab = "expend resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["status"])
+
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 2)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.- income)
+                  , data = teengamb))
+m <- residuals(lm(update(fmla, income~.-income)
+                  , data = teengamb))
+
+plot(d~m
+     , xlab = "salary resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["income"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 3)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.- verbal)
+                  , data = teengamb))
+m <- residuals(lm(update(fmla, ratio~.-verbal)
+                  , data = teengamb))
+
+plot(d~m
+     , xlab = "ratio resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["verbal"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 4)
+
+# exercises
+data("prostate")
+names(prostate)
+fmla <- as.formula("lpsa~lcavol+lweight+age+lbph+svi+lcp+gleason+pgg45")
+lmod <- lm(fmla
+           , data = prostate)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = prostate)
+
+# leverage
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+pros <- rownames(prostate)
+halfnorm(hatv, labs=pros
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(prostate)*2), nrow(prostate) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = teens
+         , ylab = "Cook's Distances")
+plot(lmod, which = 5)
+
+# exercises
+data("swiss")
+names(swiss)
+fmla <- as.formula("Fertility~Agriculture+Examination+Education+Catholic+Infant.Mortality")
+lmod <- lm(fmla
+           , data = swiss)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(total ~ expend + salary + ratio + takers
+       , data = sat)
+
+# leverage
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+sweez <- rownames(swiss)
+halfnorm(hatv, labs=sweez
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(swiss)*2), nrow(swiss) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = sweez
+         , ylab = "Cook's Distances")
+
+lmod1 <- lm(fmla
+            , data = swiss
+            , subset = cook < max(cook))
+sumary(lmod)
+sumary(lmod1)
+
+plot(dfbeta(lmod)[,2]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+# exercises
+data("cheddar")
+names(cheddar)
+fmla <- as.formula("taste~Acetic+H2S+Lactic")
+lmod <- lm(fmla
+           , data = cheddar)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = cheddar)
+
+# leverage
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+chees <- rownames(cheddar)
+halfnorm(hatv, labs=chees
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(cheddar)*2), nrow(cheddar) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = teens
+         , ylab = "Cook's Distances")
+plot(lmod, which = 5)
+
+plot(dfbeta(lmod)[,4]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.-Acetic)
+                  , data = cheddar))
+m <- residuals(lm(update(fmla, Acetic~.-Acetic)
+                  , data = cheddar))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["Acetic"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 1)
+
+d <- residuals(lm(update(fmla, .~.-H2S)
+                  , data = cheddar))
+m <- residuals(lm(update(fmla, H2S~.-H2S)
+                  , data = cheddar))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["H2S"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 2)
+
+d <- residuals(lm(update(fmla, .~.-Lactic)
+                  , data = cheddar))
+m <- residuals(lm(update(fmla, Lactic~.-Lactic)
+                  , data = cheddar))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["Lactic"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 2)
+
+# exercises
+data("happy")
+names(happy)
+fmla <- as.formula("happy~money+sex+love+work")
+lmod <- lm(fmla
+           , data = happy)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = happy)
+
+# leverage
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+smiles <- rownames(happy)
+halfnorm(hatv, labs=smiles
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(happy)*2), nrow(happy) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = teens
+         , ylab = "Cook's Distances")
+plot(lmod, which = 5)
+
+lmod1 <- lm(fmla
+            , data = happy
+            , subset = cook < max(cook))
+sumary(lmod)
+sumary(lmod1)
+
+plot(dfbeta(lmod)[,2]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+plot(dfbeta(lmod)[,3]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+plot(dfbeta(lmod)[,4]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.-money)
+                  , data = happy))
+m <- residuals(lm(update(fmla, money~.-money)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["money"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 1)
+
+d <- residuals(lm(update(fmla, .~.-love)
+                  , data = happy))
+m <- residuals(lm(update(fmla, love~.-love)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["love"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 3)
+
+d <- residuals(lm(update(fmla, .~.-sex)
+                  , data = happy))
+m <- residuals(lm(update(fmla, sex~.-sex)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["sex"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 2)
+
+d <- residuals(lm(update(fmla, .~.-work)
+                  , data = happy))
+m <- residuals(lm(update(fmla, work~.-work)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["work"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 4)
+
+# exercises
+data("happy")
+names(happy)
+fmla <- as.formula("happy~money+sex+love+work")
+lmod <- lm(fmla
+           , data = happy)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = happy)
+
+# leverage
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+smiles <- rownames(happy)
+halfnorm(hatv, labs=smiles
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(happy)*2), nrow(happy) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = teens
+         , ylab = "Cook's Distances")
+plot(lmod, which = 5)
+
+lmod1 <- lm(fmla
+            , data = happy
+            , subset = cook < max(cook))
+sumary(lmod)
+sumary(lmod1)
+
+plot(dfbeta(lmod)[,2]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+plot(dfbeta(lmod)[,3]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+plot(dfbeta(lmod)[,4]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.-money)
+                  , data = happy))
+m <- residuals(lm(update(fmla, money~.-money)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["money"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 1)
+
+d <- residuals(lm(update(fmla, .~.-love)
+                  , data = happy))
+m <- residuals(lm(update(fmla, love~.-love)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["love"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 3)
+
+d <- residuals(lm(update(fmla, .~.-sex)
+                  , data = happy))
+m <- residuals(lm(update(fmla, sex~.-sex)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["sex"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 2)
+
+d <- residuals(lm(update(fmla, .~.-work)
+                  , data = happy))
+m <- residuals(lm(update(fmla, work~.-work)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["work"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 4)
+
+# exercises
+data("tvdoctor")
+names(tvdoctor)
+fmla <- as.formula("life~tv+doctor")
+lmod <- lm(fmla
+           , data = tvdoctor)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = tvdoctor)
+
+hatv <- hatvalues(lmod)
+tail(sort(hatv))
+2 * sum(hatv) / nrow(sat) # larger than this is high leverage
+
+# half normal plot for diagnosing leverage
+teevs <- rownames(tvdoctor)
+halfnorm(hatv, labs=teevs
+         , ylab = "leverages")
+
+# outliers
+stud <- rstudent(lmod)
+stud[which.max(abs(stud))]
+qt(0.05/(nrow(tvdoctor)*2), nrow(tvdoctor) - 1) # bonferroni critical value
+range(rstudent(lmod))
+cook <- cooks.distance(lmod)
+halfnorm(cook, 2
+         , labs = teevs
+         , ylab = "Cook's Distances")
+plot(lmod, which = 5)
+
+lmod1 <- lm(fmla
+            , data = tvdoctor
+            , subset = cook < max(cook))
+sumary(lmod)
+sumary(lmod1)
+
+plot(dfbeta(lmod)[,2]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+plot(dfbeta(lmod)[,3]
+     , ylab="Changes in Coef")
+abline(h=0)
+
+# partial residual plots
+d <- residuals(lm(update(fmla, .~.-tv)
+                  , data = happy))
+m <- residuals(lm(update(fmla, tv~.-tv)
+                  , data = happy))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["tv"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 1)
+
+d <- residuals(lm(update(fmla, .~.-doctor)
+                  , data = tvdoctor))
+m <- residuals(lm(update(fmla, doctor~.-doctor)
+                  , data = tvdoctor))
+
+plot(m, d
+     , xlab = "takers resids"
+     , ylab = "total resids")
+coef(lm(d~m))
+coef(lmod)
+abline(0, coef(lmod)["doctor"])
+termplot(lmod
+         , partial.resid = TRUE
+         , terms = 2)
+
+
+# exercises
+data("divusa")
+names(divusa)
+fmla <- as.formula("divorce~unemployed+femlab+marriage+birth+military")
+lmod <- lm(fmla
+           , data = divusa)
+sumary(lmod)
+
+# plot lmod
+plot(fitted(lmod), residuals(lmod)
+     , xlab = "Fitted"
+     , ylab = "Residuals")
+abline(h=0)
+plot(fitted(lmod), sqrt(abs(residuals(lmod)))
+     , xlab = "Fitted"
+     , ylab = expression(sqrt(hat(epsilon))))
+# check for constant variance
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+
+# check for normality
+qqnorm(residuals(lmod)
+       , ylab="Residuals"
+       , main="")
+qqline(residuals(lmod))
+
+qqnorm(rstandard(lmod))
+abline(0,1)
+
+# test for normality
+# null is normal
+shapiro.test(residuals(lmod))
+
+# plot subsequent pairs of resids
+# obvious there is a correlation
+n <- length(residuals(lmod))
+plot(
+  tail(residuals(lmod), n-1) ~ head(residuals(lmod), n-1)
+  , xlab = expression(hat(epsilon)[i])
+  , ylab = expression(hat(epsilon)[i + 1])
+)
+abline(h=0, v=0, col=grey(0.75))
+
+sumary(lm(tail(residuals(lmod), n-1) ~
+            head(residuals(lmod), n-1), -1))
+
+# lmtest package
+dwtest(fmla
+       , data = divusa)
