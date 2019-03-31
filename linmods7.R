@@ -1,10 +1,12 @@
 library(faraway)
+library(ggplot2)
 data("cars")
 plot(dist ~ speed, data = cars)
 lmod <- lm(dist ~ speed, data = cars)
 sumary(lmod)
 abline(lmod)
 
+# error in the predictors
 lmod1 <- lm(dist ~ I(speed+rnorm(50)), data = cars)
 coef(lmod1)
 lmod2 <- lm(dist ~ I(speed+2*rnorm(50)), data = cars)
@@ -35,3 +37,23 @@ plot(variances, betas
 gv <- lm(betas~variances)
 coef(gv)
 points(0, gv$coef[1], pch=3)
+
+# scaling
+data("savings")
+scsav <- data.frame(scale(savings))
+lmod <- lm(sr ~., scsav)
+sumary(lmod)
+
+edf <- data.frame(coef(lmod), confint(lmod))
+names(edf) <- c("est", "lwr", "upr")
+p <- ggplot(aes(y=est
+                , ymin = lwr
+                , ymax = upr
+                , x = row.names(edf))
+            , data = edf)
+p + geom_pointrange() +
+  coord_flip() +
+  geom_hline(yintercept=0, col=gray(0.75)) +
+  xlab("predictor") +
+  theme_bw()
+
