@@ -4,7 +4,7 @@ library(nlme)
 library(mgcv)
 library(quantreg)
 library(ggplot2)
-
+library(MASS)
 # correlated resids
 data("globwarm")
 lmod <- lm(nhtemp~wusa+jasper+westgreen+chesapeake+
@@ -289,5 +289,60 @@ glmod <- gls(taste ~ Lactic + H2S + Acetic
           , correlation = corAR1(form = ~cheesetime)
           , method = "ML")
 summary(glmod)
+intervals(glmod, which = "var-cov")
 sumary(lmod)
 dwtest(lmod) # there is barely any correl
+
+lmod <- lm(taste ~ Lactic + H2S + Acetic + cheesetime
+            , data = cheddar)
+sumary(lmod)
+
+data("crawl")
+View(crawl)
+lmod <- lm(crawling~temperature, data = crawl)
+sumary(lmod)
+plot(lmod)
+# variance appears to be constanct
+sumary(lm(sqrt(abs(residuals(lmod))) ~ fitted(lmod)))
+# this doesn't seem appropriate because SD is not correlated to n
+lmod <- lm(crawling~temperature, data = crawl, weights = crawl$n)
+sumary(lmod)
+# SD suggests varying quality of score, so this is better
+lmod <- lm(crawling~temperature, data = crawl, weights = 1/crawl$SD)
+sumary(lmod)
+
+data("gammaray")
+View(gammaray)
+# there is a measurement error
+plot(flux~time, data=gammaray)
+plot(log(flux)~log(time), data=gammaray)
+
+lmod <- lm(flux~log(time)
+           , data = gammaray
+           , weights = 1/gammaray$error)
+sumary(lmod)
+
+data("fat", package = "faraway")
+lmod <- lm(brozek~age + weight + height + neck + 
+             chest + abdom + hip + thigh + knee +
+             ankle + biceps + forearm + wrist
+           , data = fat)
+
+rlmod <- rlm(brozek~age + weight + height + neck + 
+             chest + abdom + hip + thigh + knee +
+             ankle + biceps + forearm + wrist
+           , data = fat)
+wts <- rlmod$w
+names(wts) <- rownames(fat)
+head(sort(wts), 40) # top two are among the largest resids
+head(sort(resid(rlmod)), 40)
+x <- model.matrix(lmod)
+x0 <- apply(x, 2, median)
+x0
+x[224, ]
+fat$brozek[224]
+x[207, ]
+fat$brozek[207]
+# these guys are close to the median predictors but very high or very low on the response
+plot(weight~height, data =fat) # not the same outliers
+plot(rlmod)
