@@ -280,5 +280,5 @@ lines(x, y, col=2, lty = 2)
 lmod3 <- lm(sqrt(dist) ~ speed, data=cars)
 y <- predict(lmod3, newdata = data.frame(speed = x))^2
 lines(x, y, col=3, lty = 3)
-sp <- smooth.spline(cars$speed, cars$dist)            
+sp <- smooth.spline(cars$speed, cars$dist)           
 lines(sp, col=4, lty=4)
