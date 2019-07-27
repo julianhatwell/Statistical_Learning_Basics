@@ -27,7 +27,8 @@ stderr <- sqrt(1 - hat)
 
 op <- par(mar = c(5,4,1,1)+.1)
 plot(fit, stderr, cex = 5 * hat,
-     ylab = "Std. Error of Residual", xlab = "Fitted Frequency",
+     ylab = "Std. Error of Residual"
+     , xlab = "Fitted Frequency",
      cex.lab = 1.2)
 labs <- with(berkeley,
              paste(Dept, substr(Gender, 1, 1), ifelse(Admit == "Admitted", "+", "-"), sep = ""))
@@ -35,17 +36,20 @@ col <- ifelse(berkeley$Admit == "Admitted", "blue", "red")
 text(fit, stderr, labs, col = col, cex = 1.2)
 par(op)
 
-# looking at the mutual independance model, though we know it can't be true
+# looking at the mutual independance model
+# though we know it can't be true
 # and we're trying to investigate gender bias
 data("UCBAdmissions")
 berk.loglm0 <- loglm(~ Dept + Gender + Admit, data = UCBAdmissions,
                      param = TRUE, fitted = TRUE)
 berk.loglm0
 # using the fitted frequencies to view the table of expected values
-structable(Dept ~ Admit + Gender, fitted(berk.loglm0))
+structable(Dept ~ Admit + Gender
+           , fitted(berk.loglm0))
 
 # conditional independence in UCB admissions data
-berk.loglm1 <- loglm(~ Dept * (Gender + Admit), data = UCBAdmissions)
+berk.loglm1 <- loglm(~ Dept * (Gender + Admit)
+                     , data = UCBAdmissions)
 berk.loglm1
 
 # homogeneous association, [AD][AG][GD]
@@ -101,8 +105,10 @@ mosaic(berk.glm3, shade = TRUE,
 # log odds of admission - log(admit/reject)
 (obs <- log(UCBAdmissions[1,,] / UCBAdmissions[2,,]))
 
-berk.logit2 <- glm(Admit == "Admitted" ~ Dept + Gender,
-                   data = berkeley, weights = Freq, family = "binomial")
+berk.logit2 <- glm(Admit == "Admitted" ~ Dept + Gender
+                   , data = berkeley
+                   , weights = Freq
+                   , family = "binomial")
 summary(berk.logit2)
 
 # special model for dept A

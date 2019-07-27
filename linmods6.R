@@ -199,7 +199,9 @@ lmod <- lm(sr ~ pop15 + pop75 + dpi + ddpi
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
 
-qt(0.05/(50*2), 44) # bonferroni critical value
+n <- nrow(savings)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
 
 
 data(star, package = "faraway")
@@ -332,7 +334,9 @@ halfnorm(hatv, labs=states
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(50*2), 49) # bonferroni critical value
+n <- nrow(sat)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 3
@@ -476,7 +480,9 @@ halfnorm(hatv, labs=teens
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(teengamb)*2), nrow(teengamb) - 1) # bonferroni critical value
+n <- nrow(teengamb)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -620,7 +626,9 @@ halfnorm(hatv, labs=pros
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(prostate)*2), nrow(prostate) - 1) # bonferroni critical value
+n <- nrow(prostate)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -690,7 +698,9 @@ halfnorm(hatv, labs=sweez
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(swiss)*2), nrow(swiss) - 1) # bonferroni critical value
+n <- nrow(swiss)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -769,7 +779,9 @@ halfnorm(hatv, labs=chees
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(cheddar)*2), nrow(cheddar) - 1) # bonferroni critical value
+n <- nrow(cheddar)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -889,7 +901,10 @@ halfnorm(hatv, labs=smiles
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(happy)*2), nrow(happy) - 1) # bonferroni critical value
+n <- nrow(happy)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
+
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -1038,7 +1053,10 @@ halfnorm(hatv, labs=smiles
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(happy)*2), nrow(happy) - 1) # bonferroni critical value
+n <- nrow(happy)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
+
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -1186,7 +1204,10 @@ halfnorm(hatv, labs=teevs
 # outliers
 stud <- rstudent(lmod)
 stud[which.max(abs(stud))]
-qt(0.05/(nrow(tvdoctor)*2), nrow(tvdoctor) - 1) # bonferroni critical value
+n <- nrow(tvdoctor)
+p <- length(names(coef(lmod))) + 1
+qt(0.05/(n*2), n-p) # bonferroni critical value
+
 range(rstudent(lmod))
 cook <- cooks.distance(lmod)
 halfnorm(cook, 2
@@ -1288,3 +1309,4 @@ sumary(lm(tail(residuals(lmod), n-1) ~
 # lmtest package
 dwtest(fmla
        , data = divusa)
+

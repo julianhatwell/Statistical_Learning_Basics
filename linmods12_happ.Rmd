@@ -1,0 +1,66 @@
+---
+title: "Untitled"
+author: "Julian Hatwell"
+date: "7/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(faraway)
+library(gridExtra)
+library(ggplot2)
+library(lattice)
+library(corrplot)
+library(dplyr)
+```
+
+```{r summ}
+data("happy")
+summary(happy)
+```
+
+```{r scaling}
+happy_trs <- happy %>%
+  transmute(happy = happy / 2
+            , money = money / 35
+            , love = love * 5 / 3
+            , work = work
+            , sex = factor(sex))
+summary(happy_trs)
+```
+
+```{r}
+corrplot(cor(dplyr::select(happy_trs, -sex)))
+bwplot(happy~sex, data=happy_trs)
+```
+
+Money appears to be less correlated with happiness. A satisfactory sex life reduces the variance.
+
+```{r main_effs}
+g1 <- ggplot(data = happy_trs
+       , aes(x = love, y = happy)) +
+  geom_point(position = position_jitter(width = 0.2)) +
+  stat_smooth(method = "lm")
+g2 <- ggplot(data = happy_trs
+       , aes(x = work, y = happy)) +
+  geom_point(position = position_jitter(width = 0.2)) +
+  stat_smooth(method = "lm")
+g3 <- ggplot(data = happy_trs
+       , aes(x = money, y = happy)) +
+  geom_point() +
+  stat_smooth(method = "lm")
+g4 <- ggplot(data = happy_trs
+       , aes(x = sex, y = happy)) +
+  geom_point(position = position_jitter(width = 0.2)) +
+  stat_smooth(method = "lm")
+grid.arrange(g1, g2, g3, g4, nrow=2)
+```
+
+
+```{r}
+lmod1 <- lm(happy~love+work, data=happy_trs)
+sumary(lmod1)
+plot(lmod1, which = 2)
+```

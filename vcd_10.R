@@ -562,3 +562,4 @@ ggplot(logitsFit, aes(x = as.numeric(class), y = logitH,
              aes(x = as.numeric(class), y = logitH, color = smoke),
              size = 3) +
   theme(legend.position = c(0.85, .6))
+
