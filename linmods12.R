@@ -6,6 +6,8 @@ library(lmtest)
 library(leaps)
 library(nlme)
 library(glmnet)
+
+# consider the ecological fallacy. group corralation might not hold for the individual level.
 data("eco")
 plot(income~usborn, data=eco
      , xlab = "Proportion of US Born"
@@ -18,6 +20,7 @@ plot(income~usborn, data=eco
      , xlim = c(0,1)
      , ylim = c(15000, 70000))
 abline(lmod)
+sumary(lmod) # inference is wrong because immigrants are naturally attracted to wealther states
 
 data("chredlin")
 head(chredlin)
@@ -50,6 +53,10 @@ ggplot(data = chredlin
                                         , height = 0)) +
   stat_summary(geom = "errorbar", colour = "red")
 
+# there is a clear correlation - insurance companies tend not to insure high race areas
+sumary(lm(involact ~ race, data = chredlin))
+
+# but are there other factors?
 ggplot(data = chredlin
        , aes(x = race, y = fire)) +
   geom_point() +
@@ -59,13 +66,19 @@ ggplot(data = chredlin
   geom_point() +
   stat_smooth(method = "lm")
 
+# a full model
 lmod <- lm(involact ~ fire + race + theft + age + log(income)
            , data = chredlin)
 sumary(lmod)
-plot(lmod, 1:2) # streak is from zero valued, otherwise OK
-termplot(lmod, partial.resid = TRUE, terms=1:2)
-termplot(lmod, partial.resid = TRUE, terms=3:4)
+plot(lmod, which = 1) # streak is from zero valued, otherwise OK
+plot(lmod, which = 2)
 
+# termplots are useful to seek potential transformations
+termplot(lmod, partial.resid = TRUE, terms=1:2)
+termplot(lmod, partial.resid = TRUE, terms=3)
+termplot(lmod, partial.resid = TRUE, terms=4)
+
+# should we adjust the response - are the conclusions robust?
 listcombo <- unlist(
   sapply(0:4
          , function(x) {
@@ -84,8 +97,10 @@ for (i in 1:16) {
 }
 rownames(coefm) <- predterms
 colnames(coefm) <- c("beta", "pvalue")
-round(coefm, 4)
+round(coefm, 4) # we are looking at how stable the race variable was
+# significance is not related to choice of other preds
 
+# now look at how stable is was under removal of points
 diags <- data.frame(lm.influence(lmod)$coef)
 ggplot(data = diags
        , aes(x = row.names(diags)
@@ -95,6 +110,7 @@ ggplot(data = diags
   geom_hline(yintercept = 0) +
   geom_linerange(aes(ymax = 0, ymin = race))
 
+# same but for both theft and fire
 ggplot(data = diags
        , aes(x = fire
              , y = theft)) +
@@ -104,7 +120,8 @@ ggplot(data = diags
              , y = log.income.)) +
   geom_text(label = row.names(diags))
 plot(lmod, 5) # none are extreme outliers
-chredlin[c("60607", "60610"), ]
+
+chredlin[c("60607", "60610"), ] # the two zip codes that stand out, but aren't outliers
 match(c("60607", "60610"), row.names(chredlin))
 lmode <- lm(involact ~ fire + race + theft + age + log(income)
             , data = chredlin[

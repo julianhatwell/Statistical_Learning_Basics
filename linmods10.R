@@ -107,7 +107,7 @@ b <- regsubsets(gamble ~ .
                 , data = teengamb)
 rs <- summary(b)
 rs$which
-n <- nrow(prostate)
+n <- nrow(teengamb)
 AIC <- n * log(rs$rss/n) + (2:5)*2
 plot(AIC ~ I(2:5)
      , ylab = "AIC"
