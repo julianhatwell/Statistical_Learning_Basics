@@ -1,6 +1,9 @@
 library(faraway)
 library(MASS)
 library(ggplot2)
+library(quantreg)
+library(lmtest)
+
 data(sexab)
 by(sexab, sexab$csa, summary)
 plot(ptsd~csa, sexab)
@@ -263,7 +266,271 @@ ggplot(data = chredlin
                                         , height = 0)) +
   stat_summary(geom = "errorbar", colour = "red")
 
+t.test(chredlin$involact[chredlin$side == "s"]
+       , chredlin$involact[chredlin$side == "n"])
+
+lmodnull <- lm(involact~1, data=chredlin)
+
+lmodside <- lm(involact ~ side, data=chredlin)
+
 lmods <- lm(involact ~ race + side
             , data = chredlin)
-t.test(chredlin$involact[chredlin$side == "s"], chredlin$involact[chredlin$side == "n"])
-  
+anova(lmodside)
+anova(lmodnull, lmodside, lmods)
+summary(lmods)
+lmodfull <- lm(involact ~ race +
+                       fire + theft +
+                       age + log(income)
+               , data = chredlin)
+anova(lmodfull)
+lmodfull <- lm(involact ~ race +
+                       fire + theft +
+                       age + side
+               , data = chredlin)
+anova(lmodfull)
+
+# the idea is to see how covariates affect race in the neighbourhood
+# should we adjust the response - are the conclusions robust?
+listcombo <- unlist(
+        sapply(0:5
+               , function(x) {
+                       combn(5, x, simplify = FALSE)
+               })
+        , recursive = FALSE)
+
+predterms <- lapply(listcombo, function(x) {
+        paste(c("race", c("fire", "theft", "age", "log(income)", "side")[x])
+              , collapse = "+")})
+coefm <- matrix(NA, 32, 2)
+for (i in 1:32) {
+        lmi <- lm(as.formula(paste("involact ~ ", predterms[[i]]))
+                  , data = chredlin)
+        coefm[i, ] <- sumary(lmi)$coef[2, c(1,4)]
+}
+rownames(coefm) <- predterms
+colnames(coefm) <- c("beta", "pvalue")
+round(coefm, 4) # we are looking at how stable the race variable was
+# significance is robust to adding side
+
+data("uswages")
+names(uswages)
+lmodfull <- lm(wage ~ educ + exper + 
+               race + smsa + ne +
+               we + so + pt # exclude mw - the regions are already dummy coded
+               , data = uswages)  
+summary(lmodfull)               
+# looks like we can exclude similar regions
+lmodreg <- lm(wage ~ educ + exper + 
+               race + smsa + 
+               we + pt # exclude mw - the regions are already dummy coded
+               , data = uswages)  
+summary(lmodreg)               
+# everything else is significant
+
+# check model accumptions
+plot(lmodreg, which = 1) # heteroskedastic
+plot(lmodreg, which = 2)
+
+# better start again
+ggplot(data = uswages, aes(x = educ, y = wage)) +
+        geom_point() +
+        stat_smooth(method = lm)
+ggplot(data = uswages, aes(x = educ, y = log(wage))) +
+        geom_point() +
+        stat_smooth(method = lm)
+# exper looks like a poly 2
+ggplot(data = uswages, aes(x = exper, y = wage)) +
+        geom_point() +
+        stat_smooth(method = lm)
+ggplot(data = uswages, aes(x = exper, y = log(wage))) +
+        geom_point() +
+        stat_smooth(method = lm)
+
+lmodt <- lm(log(wage) ~ educ + poly(exper, 2) + 
+                    race + smsa + ne +
+                    we + so + pt
+            , data = uswages)
+sumary(lmodt)
+# it seems that none of the regions are signif
+lmodr <- lm(log(wage) ~ educ + poly(exper, 2) + 
+                    race + smsa + pt
+            , data = uswages)
+sumary(lmodr)
+anova(lmodr, lmodt) # we can def do without region
+plot(lmodr, which = 1)
+plot(lmodr, which = 2) # this is not great
+plot(lmodr, which = 3)
+plot(lmodr, which = 5)
+termplot(lmodr
+         , partial.resid = TRUE
+         , terms = 1)
+termplot(lmodr
+         , partial.resid = TRUE
+         , terms = 2)
+termplot(lmodr
+         , partial.resid = TRUE
+         , terms = 3)
+termplot(lmodr
+         , partial.resid = TRUE
+         , terms = 4)
+termplot(lmodr
+         , partial.resid = TRUE
+         , terms = 5)
+
+plot(density(resid(lmodr))) # could resid outliers be a problem
+head(sort(cooks.distance(lmodr))) # these are tiny
+
+matplot(dfbeta(lmodr)
+     , ylab="Changes in Coef")
+which.max(dfbeta(lmodr)[,4])
+
+# try without this one point
+lmodro <- lm(log(wage) ~ educ + poly(exper, 2) + 
+                    race + smsa + pt
+            , data = uswages[-1576, ])
+sumary(lmodro)
+plot(lmodro, which = 2) # not making this much better. signs of long tail distr
+
+
+# we have a large sample, so it's probably OK, but...
+# try robust method
+rlmodr <- rlm(log(wage) ~ educ + poly(exper, 2) + 
+                      race + smsa + pt
+              , data = uswages)
+summary(rlmodr)
+head(sort(rlmodr$w), 50) # a lot of instances have been downweighted
+
+# lad regression
+lmodlad <- rq(log(wage) ~ educ + poly(exper, 2) + 
+                      race + smsa + pt
+              , data = uswages)
+
+
+coef(lmodr)
+coef(rlmodr) # very close
+coef(lmodlad) # slightly less but still very close
+# just accept the LSq model
+
+data(clot)
+plot(time~conc
+     , col = clot$lot
+     , pch = as.character(clot$lot)
+     , data = clot)
+
+plot(I(1/time)~conc
+     , col = clot$lot
+     , pch = as.character(clot$lot)
+     , data = clot)
+
+plot(time~log(conc)
+     , col = clot$lot
+     , pch = as.character(clot$lot)
+     , data = clot)
+
+plot(I(1/time)~I(log(conc))
+     , col = clot$lot
+     , pch = as.character(clot$lot)
+     , data = clot)
+     
+lmod <- lm(I(1/time)~(log(conc)) * lot
+           , data = clot)
+sumary(lmod)
+plot(lmod, which = 1)
+plot(lmod, which = 2)
+abline(0,1) # looks like short tailed, not serious
+plot(lmod, which = 3)
+plot(lmod, which = 5)
+shapiro.test(resid(lmod)) # normal resids
+dfb <- dfbetas(lmod)
+matplot(dfb[,2:4])
+halfnorm(hatvalues(lmod))
+summary(lmod)
+lo <- factor(c("one", "two"))
+# when do they predict the smae
+plot(I(1/time)~I(log(conc))
+     , col = clot$lot
+     , pch = as.character(clot$lot)
+     , data = clot
+     , xlim = c(0, 5)
+     , ylim = c(-0.1, 0.1))
+abline(coef(lmod)[1:2])
+abline(coef(lmod)[1] + coef(lmod)[3]
+       , coef(lmod)[2] + coef(lmod)[4]
+       , col = "red")
+
+# when does the slope cancel out the intercept for lot two?
+xtest <- clot[c(1, 10), ]
+xtest$conc <- exp(-coef(lmodt)[3]/coef(lmodt)[4]) # raw concentration level
+1/predict(lmod, xtest)
+
+data(fortune)
+plot(wealth~age, data = fortune
+     , pch = as.character(fortune$region)
+     , col = fortune$region)
+ggplot(data = fortune
+       , aes(x = age, y = log(wealth), colour = region)) +
+        geom_point() +
+        stat_smooth(method = lm) +
+        facet_grid(.~region)
+lmod <- lm(log(wealth)~age + region, data=fortune)
+sumary(lmod)
+glmod <- glm(wealth~age + region, data=fortune
+             , family = poisson)
+summary(glmod)
+
+data(hips)
+plot(faft~fbef, data = hips
+     , col = hips$grp
+     , pch = as.character(hips$grp))
+lmod0 <- lm(faft~1, data = hips)
+lmod1 <- lm(faft~fbef, data = hips)
+lmod2 <- lm(faft~fbef+grp, data = hips)
+lmod3 <- lm(faft~fbef*grp, data = hips)
+anova(lmod0, lmod1, lmod2, lmod3)
+sumary(lmod2)
+t.test((hips$faft - hips$fbef)[hips$grp == "treat"]
+       , (hips$faft - hips$fbef)[hips$grp == "control"])
+dfbetas(lmod2)
+hatv <- hatvalues(lmod2)
+names(hatv) <- rownames(hips)
+tail(sort(hatv)) # suddenly double the size, these resids
+halfnorm(hatvalues(lmod2), nlab = 3)
+plot(lmod2, which = 1)
+plot(resid(lmod2)[-c(49, 50, 70)]~fbef
+     , data = hips[-c(49, 50, 70), ]
+     , ylim = c(-30, 25)
+     , xlim = c(75, 140))
+points(resid(lmod2)[c(49, 50, 70)]~fbef
+       , data = hips[c(49, 50, 70), ]
+       , col = "red")
+plot(lmod2, which = 3)
+plot(lmod2, which = 5) # possibly 3 high leverage points
+shapiro.test(resid(lmod2)) # reject normal distrib
+qqnorm(rstandard(lmod2))
+abline(0, 1)
+plot(lmod2, which = 2)
+qt(0.95, summary(lmod2)$df[2]) # nothing is strictly an outlier
+
+lmod4 <- lm(faft~fbef+grp
+            , data = hips[-c(49, 50, 70), ])
+sumary(lmod4)
+t.test((hips$faft - hips$fbef)[hips$grp == "treat"][-c(49, 50, 70)]
+       , (hips$faft - hips$fbef)[hips$grp == "control"][-c(49, 50, 70)])
+confint(lmod4)[3, ] # not sure why the t-test is no good here
+
+# both legs have been included, so we probably have correlated resids
+dwtest(faft~fbef+grp
+       , data = hips) # yes some autocorrel
+agg <- aggregate(hips[,c("fbef", "faft")]
+          , list(hips$person)
+          , mean)
+status <- unique(hips[, c("grp", "person")])
+rownames(status) <- status$person
+agg$grp <- status[agg$Group.1, "grp"]
+lmod5 <- lm(faft~fbef+grp, data = agg)
+sumary(lmod5)
+coef(lmod4)[3]
+confint(lmod4)[3, ] # not sure why the t-test is no good here
+coef(lmod5)[3]
+confint(lmod5)[3, ]
+# confint is larger, but so is effect
