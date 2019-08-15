@@ -1,5 +1,7 @@
 library(faraway)
 library(ggplot2)
+library(lattice)
+library(car)
 data("coagulation")
 coagulation
 plot(coag~diet, data = coagulation)
@@ -60,3 +62,38 @@ names(which(sort(pvals) < 1:length(pvals)*0.05/length(pvals)))
 # more conveniently
 padj <- p.adjust(pvals, method = "fdr")
 coef(lmod)[padj < 0.05]
+
+data(pulp)
+names(pulp)
+plot(bright~operator, data = pulp)
+summary(aov(bright~operator, data = pulp))
+summary(lm(bright~operator, data = pulp))
+stripchart(bright~operator, data = pulp
+           , vertical = TRUE, method = "stack")
+stripplot(jitter(bright)~operator, data = pulp
+           , vertical = TRUE, method = "stack")
+stripplot(bright~jitter(as.numeric(operator), 0.5), data = pulp
+          , vertical = TRUE, method = "stack"
+          , xlab = "operator"
+          , scales = list(x = list(labels = c("a","a", "b", "c", "d"))))
+
+data("chickwts")
+plot(weight~feed, data = chickwts)
+lmod <- lm(weight~feed, data = chickwts)
+summary(lmod)
+# no intercept model against null
+lmod <- lm(weight~feed - 1, data = chickwts)
+sumary(lmod)
+lmnull <- lm(weight~1, data = chickwts)
+anova(lmnull, lmod)
+
+qqnorm(resid(lmod))
+qqline(resid(lmod))
+plot(jitter(fitted(lmod)), resid(lmod))
+med <- with(chickwts, tapply(weight, feed, median))
+ar <- with(chickwts, abs(weight-med[feed]))
+anova(lm(ar~feed, data = chickwts)) # Levene's Test
+# no evidence of non-constant variance
+bartlett.test(weight~feed, data = chickwts)
+# to see if group variances are the same
+leveneTest(weight~feed, data = chickwts)
