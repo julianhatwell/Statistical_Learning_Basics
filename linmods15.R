@@ -70,12 +70,11 @@ summary(lm(bright~operator, data = pulp))
 stripchart(bright~operator, data = pulp
            , vertical = TRUE, method = "stack")
 stripplot(jitter(bright)~operator, data = pulp)
-stripplot(bright~jitter(as.numeric(operator), 0.5), data = pulp
-          , xlab = "operator"
-          , scales = list(x = list(
-            at = 1:4
-            , labels = c("a", "b", "c", "d")))
+stripplot(bright~operator, data = pulp
+          , horizontal = FALSE
+          , jitter.data = TRUE
 )
+
 # bonferroni
 pvals <- summary(lmod)$coef[, 4]
 padj <- p.adjust(pvals, method = "bonferroni")
@@ -112,12 +111,11 @@ data("PlantGrowth")
 plot(weight~group, data = PlantGrowth)
 stripchart(weight~group,data = PlantGrowth
            , vertical = TRUE, method = "stack")
-stripplot(weight~jitter(as.numeric(group), 0.5), data = PlantGrowth
-          , xlab = "group"
-           , scales = list(x = list(
-             at = 1:3
-             , labels = c("ctrl", "trt1", "trt2")))
+stripplot(weight~group, data = PlantGrowth
+          , horizontal = FALSE
+          , jitter.data = TRUE
 )
+          
 lmod <- lm(weight~group, data = PlantGrowth)
 lmnull <- lm(weight~1, data = PlantGrowth)
 anova(lmnull, lmod)
@@ -160,11 +158,9 @@ data("anaesthetic")
 plot(breath~tgrp, data = anaesthetic)
 stripchart(breath~tgrp, data = anaesthetic
            , vertical = TRUE, method = "stack")
-stripplot(breath~jitter(as.numeric(tgrp), 0.5), data = anaesthetic
-          , xlab = "group"
-          , scales = list(x = list(
-            at = 1:4
-            , labels = c("A", "B", "C", "D")))
+stripplot(breath~tgrp, data = anaesthetic
+          , horizontal = FALSE
+          , jitter.data = TRUE
 )
 ggplot(data = anaesthetic
        , aes(x = tgrp, y = breath)) +
@@ -187,3 +183,70 @@ bartlett.test(breath~tgrp, data = anaesthetic) # not satisfactory
 leveneTest(breath~tgrp, data = anaesthetic)
 # Wikipedia says that Bartlett's test is more sensitive to violations of normality than Levene's test.
 # So you may have non-normal data instead of heteroscedastic data.
+
+data("butterfat")
+maturebutter <- butterfat[butterfat$Age == "Mature",]
+plot(Butterfat ~ Breed, data = maturebutter)
+ggplot(data = maturebutter
+       , aes(x = Breed, y = Butterfat)) +
+  geom_boxplot() +
+  geom_point(position = position_jitter(width = 0.1))
+stripchart(Butterfat ~ Breed, data = maturebutter
+           , vertical = TRUE, method = "stack")
+stripplot(Butterfat~Breed, data = maturebutter
+          , xlab = "bfat"
+          , horizontal = FALSE
+          , jitter.data = TRUE
+)
+summary(aov(Butterfat ~ Breed, data = maturebutter))
+lmod <- lm(Butterfat ~ Breed, data = maturebutter)
+summary(lmod)
+qqnorm(resid(lmod)) # not good
+qqline(resid(lmod)) 
+plot(jitter(fitted(lmod)), resid(lmod)) # heterosked?
+
+bartlett.test(Butterfat ~ Breed, data = maturebutter) 
+# to see if group variances are the same - no evidence of diff
+leveneTest(Butterfat ~ Breed, data = maturebutter)
+
+(tci <- TukeyHSD(aov(Butterfat ~ Breed, data = maturebutter)))
+plot(tci)
+
+data("denim")
+plot(waste~supplier, data = denim)
+summary(aov(waste~supplier, data = denim))
+lmod <- lm(waste~supplier, data = denim)
+summary(lmod)
+qqnorm(resid(lmod)) # outliers might be a problem
+qqline(resid(lmod)) 
+plot(jitter(fitted(lmod)), resid(lmod)) # heterosked?
+
+bartlett.test(waste~supplier, data = denim) # this is sensitive to non-normality. confirms problem with outlier
+leveneTest(waste~supplier, data = denim)
+
+denmax <- denim[denim$waste < 30,]
+nrow(denmax) # two outliers
+
+plot(waste~supplier, data = denmax)
+summary(aov(waste~supplier, data = denmax))
+lmod <- lm(waste~supplier, data = denmax)
+summary(lmod)
+qqnorm(resid(lmod)) # outliers might be a problem
+qqline(resid(lmod)) 
+plot(jitter(fitted(lmod)), resid(lmod)) # heterosked?
+
+bartlett.test(waste~supplier, data = denmax) # now reveals differet variances
+leveneTest(waste~supplier, data = denmax) # now reveals differet variances
+
+# bonferroni
+pvals <- summary(lmod)$coef[, 4]
+padj <- p.adjust(pvals, method = "bonferroni")
+coef(lmod)[padj < 0.05]
+# benjamin and hochberg method, better for large numbers of comparisons
+names(which(sort(pvals) < 1:length(pvals)*0.05/length(pvals)))
+# more conveniently
+padj <- p.adjust(pvals, method = "fdr")
+coef(lmod)[padj < 0.05]
+# with 4 choose 2 pairwise tests, none are signif
+(tci <- TukeyHSD(aov(waste~supplier, data = denmax)))
+plot(tci)
