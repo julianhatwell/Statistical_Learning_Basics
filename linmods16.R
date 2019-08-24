@@ -1,6 +1,7 @@
 library(faraway)
 library(ggplot2)
 library(lattice)
+library(car)
 data("composite")
 composite
 ggplot(data = composite
@@ -350,3 +351,42 @@ anova(lmod)
 summary(aov(lmod))
 TukeyHSD(aov(lmod)) # only D-B is not signif
 plot(I(time^-0.75) ~ treat, data = rats)
+
+data("peanut")
+nrow(peanut) # enough for all 2-way
+lmod <- lm(solubility ~., data = peanut)
+summary(lmod)
+model.matrix(lmod)
+lmod <- lm(solubility ~ (press + temp + moist + flow + size)^2, data = peanut)
+summary(lmod)
+qqnorm(coef(lmod)[-1], pch = ".")
+qqline(coef(lmod)[-1])
+qq <- qnorm(seq(1, length(coef(lmod)[-1]) - 1, length.out = length(coef(lmod)[-1]))/length(coef(lmod)[-1]))
+text(labels = names(sort(coef(lmod)[-1]))
+     , qq, sort(coef(lmod)[-1])
+     , cex = 1)
+
+data("hsb")
+nrow(hsb)
+lmodi <- lm(math ~ (gender + race + schtyp + prog + ses)^2, data = hsb)
+summary(lmodi) # 41 params including intercept
+model.matrix(lmodi)[, -1]
+ncol(model.matrix(lmodi)[, -1])
+# 2 * gender, 2 * schtyp, 4 * race, 3 * prog, 3 * ses
+anova(lmodi)
+# gender, schtyp and ses can go and there are no two ways.
+drop1(lmodi, ~ (gender + race + schtyp + prog + ses)^2, test = "F")
+lmod <- lm(math ~ gender + race + schtyp + prog + ses, data = hsb)
+summary(lmod) # 41 params including intercept
+anova(lmod, lmodi)
+TukeyHSD(aov(lmod)) # whites-asians and hisp-afr are not signif diff, voc-gen not signif
+
+qqnorm(resid(lmod)) # looks OK
+qqline(resid(lmod))
+plot(jitter(fitted(lmod)), resid(lmod))
+
+lmods <- lm(math ~ race + prog, data = hsb)
+summary(lmods)
+qqnorm(resid(lmods)) # looks OK
+qqline(resid(lmods))
+plot(jitter(fitted(lmod)), resid(lmod)) # possible hetsked?
