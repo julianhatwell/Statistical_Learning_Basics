@@ -78,3 +78,31 @@ outer(scoefs, scoefs, "-") # D-B and D-C are not significant
 # compare to completely randomized
 lmodr <- lm(wear ~ material, data = abrasion)
 (summary(lmodr)$sig/summary(lmod)$sig)^2
+
+data("rabbit")
+View(rabbit)
+xtabs(gain ~ treat + block, rabbit)
+ggplot(rabbit, aes(y=gain, x=block, shape=treat, colour=treat)) +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "top", legend.direction = "horizontal")
+ggplot(rabbit, aes(y=gain, x=treat, colour = block)) +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "top", legend.direction = "horizontal")
+
+lmod <- lm(gain ~ treat + block, rabbit)
+drop1(lmod, test="F") # don't use ANOVA for incomplete block designs
+plot(lmod, which = 1)
+plot(lmod, which = 2)
+# must construct tukey's CI manually
+summary(lmod)
+# the se for pairwise coparison of treatments is 2.24182
+qtukey(0.95, 6, 15) * 2.24182/sqrt(2) # 6 treatments, 15 df
+# which pairs are bigger than...
+tcoefs <- c(0, coef(lmod)[2:6])
+abs(outer(tcoefs, tcoefs, "-")) > qtukey(0.95, 6, 15) * 2.24182/sqrt(2)
+# only e-f is signif diff.
+lmodt <- lm(gain ~ treat, rabbit)
+(summary(lmodt)$sig / summary(lmod)$sigma)^2
+# the CRD would have needed 3 times as many samples to get the same precision
